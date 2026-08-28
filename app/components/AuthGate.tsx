@@ -3,6 +3,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import {
   CheckCircle2,
+  KeyRound,
   LoaderCircle,
   LockKeyhole,
   Mail,
@@ -11,7 +12,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import PagewiseDashboard from "./PagewiseDashboard";
 
-type AuthView = "loading" | "signed-out" | "email-sent" | "signed-in";
+type AuthView =
+  | "loading"
+  | "signed-out"
+  | "email-sent"
+  | "set-password"
+  | "signed-in";
 
 async function ensureUserSettings(user: User) {
   if (!supabase) return;
@@ -34,6 +40,11 @@ export function AuthGate() {
   );
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [authMethod, setAuthMethod] = useState<"password" | "magic">(
+    "password",
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -93,7 +104,7 @@ export function AuthGate() {
           return;
         }
         setSession(data.session);
-        setView("signed-in");
+        setView("set-password");
         void ensureUserSettings(data.session.user);
         return;
       }
@@ -116,7 +127,7 @@ export function AuthGate() {
           return;
         }
         setSession(data.session);
-        setView("signed-in");
+        setView("set-password");
         void ensureUserSettings(data.session.user);
         return;
       }
@@ -164,6 +175,55 @@ export function AuthGate() {
       return;
     }
     setView("email-sent");
+  }
+
+  async function signInWithPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !email.trim() || !password) return;
+
+    setSubmitting(true);
+    setError(null);
+    const { data, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+    setSubmitting(false);
+
+    if (signInError || !data.session) {
+      setError(
+        signInError?.message || "The email or password could not be verified.",
+      );
+      return;
+    }
+    setSession(data.session);
+    setPassword("");
+    setView("signed-in");
+  }
+
+  async function savePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
+      return;
+    }
+    if (password !== passwordConfirmation) {
+      setError("The passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setSubmitting(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setPassword("");
+    setPasswordConfirmation("");
+    setView("signed-in");
   }
 
   async function signOut() {
@@ -224,9 +284,39 @@ export function AuthGate() {
               <p className="eyebrow">Welcome to Pagewise</p>
               <h2>Sign in to your library</h2>
               <p className="auth-intro">
-                We’ll email you a secure sign-in link. No password to remember.
+                Use your password, or request a secure email link for first-time
+                access and recovery.
               </p>
-              <form onSubmit={sendMagicLink} className="auth-form">
+              <div className="auth-methods" aria-label="Sign-in method">
+                <button
+                  type="button"
+                  className={authMethod === "password" ? "active" : ""}
+                  onClick={() => {
+                    setAuthMethod("password");
+                    setError(null);
+                  }}
+                >
+                  Password
+                </button>
+                <button
+                  type="button"
+                  className={authMethod === "magic" ? "active" : ""}
+                  onClick={() => {
+                    setAuthMethod("magic");
+                    setError(null);
+                  }}
+                >
+                  Email link
+                </button>
+              </div>
+              <form
+                onSubmit={
+                  authMethod === "password"
+                    ? signInWithPassword
+                    : sendMagicLink
+                }
+                className="auth-form"
+              >
                 <label htmlFor="email">Email address</label>
                 <div className="email-field">
                   <Mail size={18} />
@@ -242,6 +332,24 @@ export function AuthGate() {
                     required
                   />
                 </div>
+                {authMethod === "password" && (
+                  <>
+                    <label htmlFor="password">Password</label>
+                    <div className="email-field">
+                      <KeyRound size={18} />
+                      <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="Your password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
                 {error && (
                   <p className="form-error" role="alert">
                     {error}
@@ -253,18 +361,110 @@ export function AuthGate() {
                 >
                   {submitting ? (
                     <>
-                      <LoaderCircle size={18} className="spin" /> Sending link…
+                      <LoaderCircle size={18} className="spin" />
+                      {authMethod === "password"
+                        ? "Signing in…"
+                        : "Sending link…"}
                     </>
+                  ) : authMethod === "password" ? (
+                    "Sign in"
                   ) : (
                     "Email me a sign-in link"
                   )}
                 </button>
               </form>
+              {authMethod === "password" && (
+                <button
+                  type="button"
+                  className="text-button auth-back"
+                  onClick={() => {
+                    setAuthMethod("magic");
+                    setError(null);
+                  }}
+                >
+                  First time or forgot your password? Use an email link
+                </button>
+              )}
               <p className="auth-footnote">
                 <LockKeyhole size={13} /> Your records are protected and
                 synchronized securely.
               </p>
             </>
+          )}
+
+          {view === "set-password" && (
+            <div className="password-setup">
+              <span className="success-mark">
+                <CheckCircle2 size={27} />
+              </span>
+              <p className="eyebrow">Email verified</p>
+              <h2>Create your password</h2>
+              <p className="auth-intro">
+                Use this password with your email next time. Pagewise never
+                stores it; Supabase protects it securely.
+              </p>
+              <form onSubmit={savePassword} className="auth-form">
+                <label htmlFor="new-password">New password</label>
+                <div className="email-field">
+                  <KeyRound size={18} />
+                  <input
+                    id="new-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                </div>
+                <label htmlFor="confirm-password">Confirm password</label>
+                <div className="email-field">
+                  <KeyRound size={18} />
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    placeholder="Repeat your password"
+                    value={passwordConfirmation}
+                    onChange={(event) =>
+                      setPasswordConfirmation(event.target.value)
+                    }
+                    required
+                  />
+                </div>
+                {error && (
+                  <p className="form-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button
+                  className="button button-primary auth-submit"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <LoaderCircle size={18} className="spin" /> Saving…
+                    </>
+                  ) : (
+                    "Save password and continue"
+                  )}
+                </button>
+              </form>
+              <button
+                type="button"
+                className="text-button auth-back"
+                onClick={() => {
+                  setPassword("");
+                  setPasswordConfirmation("");
+                  setError(null);
+                  setView("signed-in");
+                }}
+              >
+                Skip for now
+              </button>
+            </div>
           )}
 
           {view === "email-sent" && (

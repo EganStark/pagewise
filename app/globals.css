@@ -5833,6 +5833,31 @@ h1 {
   display: grid;
   gap: 10px;
 }
+.auth-methods {
+  margin: 0 0 20px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.auth-methods button {
+  min-height: 38px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.auth-methods button.active {
+  color: #1d1713;
+  background: var(--accent);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 14%);
+}
 .auth-form label {
   color: var(--text-secondary);
   font-size: 14px;
@@ -5900,6 +5925,12 @@ h1 {
 }
 .email-sent {
   text-align: center;
+}
+.password-setup > .success-mark {
+  margin-left: 0;
+}
+.password-setup > .auth-back {
+  display: block;
 }
 .success-mark {
   width: 54px;
