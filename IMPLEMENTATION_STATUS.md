@@ -616,8 +616,8 @@ Acceptance remaining: verify attempt updates and finish-with-rating against live
 
 - Added a manual AI review inside Edit Book for title, author, genre, pages, publication year, ISBN, description, and tags.
 - Kept every suggestion behind individual Apply controls or an explicit Apply all action; AI never changes saved data automatically.
-- Added authenticated, rate-limited server-side OpenAI access with structured output validation, no response storage, Bengali-aware instructions, and provider-first grounding.
-- Kept the feature optional: normal metadata search and manual editing continue to work without an OpenAI key.
+- Added authenticated, rate-limited server-side Groq access with structured output validation, no response storage, Bengali-aware instructions, and provider-first grounding.
+- Kept the feature optional: normal metadata search and manual editing continue to work without a Groq key.
 
 # Packet 14.2 — AI-Assisted Book Entry: Complete
 
@@ -631,14 +631,14 @@ Acceptance remaining: verify attempt updates and finish-with-rating against live
 - Added an optional AI Improve action to uncertain and unmatched Smart Import rows.
 - Preserved the parsed title and any provider metadata as grounding, while retaining existing values whenever AI returns an unknown field.
 - Kept AI review one book at a time to control cost and required the normal selection plus final Add to Library confirmation.
-- Preserved the fully manual fallback when Supabase or OpenAI is not configured.
+- Preserved the fully manual fallback when Supabase or Groq is not configured.
 
 # Packet 14.4 — AI Safety & Release Readiness: Complete
 
 - Added strict request normalization and limits for metadata fields, tags, provider candidates, years, and page counts.
 - Added safe handling for unsupported content types, malformed JSON, invalid requests, upstream failures, and timeouts.
 - Added automated request/output boundary tests plus a rendered endpoint test for the optional-unconfigured state.
-- Extended the release gate and manual checklist without making OpenAI mandatory for Pagewise.
+- Extended the release gate and manual checklist without making Groq mandatory for Pagewise.
 
 # Packet 15.1 — LitShelves Inventory Foundation: Complete
 

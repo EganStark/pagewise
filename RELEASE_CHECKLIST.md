@@ -6,7 +6,7 @@ Run `npm run release:check`. It verifies TypeScript, lint, domain tests, the pro
 
 After production environment values are present, run `npm run release:check:production`. This additionally requires a valid HTTPS Supabase URL and a non-empty public anonymous key.
 
-AI metadata review is optional. To enable it, configure `OPENAI_API_KEY` and `OPENAI_METADATA_MODEL` as server-side values. Confirm that an unsigned request is rejected, malformed input fails without contacting OpenAI, and the key never appears in browser-delivered code or logs.
+AI metadata review is optional. To enable it, configure `GROQ_API_KEY` and `GROQ_METADATA_MODEL` as server-side values. Confirm that an unsigned request is rejected, malformed input fails without contacting Groq, and the key never appears in browser-delivered code or logs.
 
 ## Supabase acceptance
 
@@ -31,8 +31,8 @@ AI metadata review is optional. To enable it, configure `OPENAI_API_KEY` and `OP
 - Sign in, open Add Book, enter a Bengali title, and review an AI suggestion without applying it.
 - Apply one suggested field, then verify the other fields stay unchanged.
 - Repeat from Edit Book and from an uncertain Smart Import row.
-- Confirm the normal provider search and manual entry still work after removing the OpenAI key.
-- Review OpenAI usage limits and billing before enabling the feature for regular use.
+- Confirm the normal provider search and manual entry still work after removing the Groq key.
+- Review Groq usage limits and billing before enabling the feature for regular use.
 
 ## Release decision
 
