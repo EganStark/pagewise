@@ -21,6 +21,7 @@ import {
   Target,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useBooks } from "../hooks/useBooks";
 import { useReadingLogs } from "../hooks/useReadingLogs";
@@ -196,14 +197,14 @@ export default function PagewiseDashboard({
         : null,
     [bookStore.books, listBookId],
   );
-  const accountName = userEmail
+  const accountName = profile.displayName || (userEmail
     ? userEmail
         .split("@")[0]
         .split(/[._-]+/)
         .filter(Boolean)
         .map((part) => part[0]?.toLocaleUpperCase() + part.slice(1))
         .join(" ")
-    : "Reader";
+    : "Reader");
   const accountInitials = accountName
     .split(/\s+/)
     .slice(0, 2)
@@ -388,12 +389,13 @@ export default function PagewiseDashboard({
               aria-expanded={accountOpen}
               onClick={() => setAccountOpen((open) => !open)}
             >
-              {accountInitials || "R"}
+              {profile.avatarUrl ? <Image src={profile.avatarUrl} alt="" width={38} height={38} unoptimized /> : accountInitials || "R"}
             </button>
             {accountOpen && (
               <div className="account-menu">
                 <span>{previewMode ? "Preview mode" : "Signed in"}</span>
-                <strong>{userEmail ?? "Local preview account"}</strong>
+                <strong>{profile.displayName || userEmail || "Local preview account"}</strong>
+                {profile.displayName && userEmail && <small>{userEmail}</small>}
                 {onSignOut && (
                   <button onClick={() => void onSignOut()}>
                     <LogOut size={16} /> Sign out
@@ -545,8 +547,15 @@ export default function PagewiseDashboard({
               theme={profile.theme}
               working={profile.working}
               error={profile.error}
+              displayName={profile.displayName}
+              birthYear={profile.birthYear}
+              bio={profile.bio}
+              avatarUrl={profile.avatarUrl}
               onTheme={profile.saveTheme}
               onSave={profile.saveProfile}
+              onSavePersonal={profile.savePersonalProfile}
+              onUploadAvatar={profile.uploadAvatar}
+              onRemoveAvatar={profile.removeAvatar}
               onSignOut={onSignOut}
             />
           ) : (
