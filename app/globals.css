@@ -7428,6 +7428,10 @@ h1 {
 }
 
 @media (max-width: 700px) {
+  html {
+    -webkit-text-size-adjust: 90%;
+    text-size-adjust: 90%;
+  }
   .internet-search-head {
     align-items: start;
     flex-direction: column;
