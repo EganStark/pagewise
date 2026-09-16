@@ -149,6 +149,7 @@ Apply every SQL migration in `supabase/migrations/` in numeric order:
 0005_backup_restore.sql
 0006_litshelves_inventory.sql
 0007_litshelves_backup_restore.sql
+0008_private_reader_profiles.sql
 ```
 
 With the Supabase CLI linked, this can be done with:
@@ -188,6 +189,23 @@ Open `http://localhost:3000`. Without Supabase credentials, the app opens in a c
 | `npm run build` | Create the standard production build |
 | `npm run release:check` | Run the complete local release gate |
 | `npm run release:check:production` | Require valid Supabase and optional-provider environment configuration |
+| `npm run android:web` | Build the self-contained mobile interface |
+| `npm run android:sync` | Build and copy Pagewise into the native Android project |
+| `npm run android:open` | Open the native project in Android Studio |
+| `npm run android:build` | Create a debug APK after Android Studio/JDK setup |
+
+## Android application
+
+The Android edition is being built as a local-first Capacitor application rather than a wrapper around the hosted website. Its bundled interface starts without Vercel, and its native SQLite schema covers Pagewise, LitShelves, reading history, profiles, and a future synchronization outbox.
+
+To compile the native project, install Android Studio with JDK 21 and the Android SDK, then run:
+
+```bash
+npm run android:sync
+npm run android:open
+```
+
+The current web application continues to use Supabase while features are migrated packet-by-packet to the device repository. Internet metadata search and optional AI assistance remain online services; the saved library and reading tools are being moved to offline device storage. Google sign-in and private Drive backup will be added after the local data workflows are complete.
 
 ## Deploying to Vercel
 

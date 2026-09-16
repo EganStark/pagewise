@@ -42,3 +42,7 @@ next-env.d.ts
 /outputs/
 /work/
 /supabase/.temp/
+/mobile-dist/
+/android/.gradle/
+/android/local.properties
+/android/app/build/
