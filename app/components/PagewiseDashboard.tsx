@@ -153,14 +153,14 @@ export default function PagewiseDashboard({
     useState<InternetSearchRequest | null>(null);
   const [searchReturnActive, setSearchReturnActive] = useState("Home");
   const bookStore = useBooks(userId, previewMode, deviceMode);
-  const inventory = useInventory(userId, previewMode);
+  const inventory = useInventory(userId, previewMode, deviceMode);
   const readingLogs = useReadingLogs(
     bookStore.books,
     previewMode,
     bookStore.patchBookLocal,
     deviceMode,
   );
-  const bookLists = useBookLists(userId, previewMode);
+  const bookLists = useBookLists(userId, previewMode, deviceMode);
   const searchableReviews = useSearchReviews(previewMode);
   const completedAttempts = useCompletedAttempts(previewMode, deviceMode);
   const streakFreeze = useStreakFreeze(previewMode, userId);

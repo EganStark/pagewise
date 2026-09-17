@@ -128,7 +128,7 @@ export function BookDetailView({
     deviceMode,
     onBookChange: onLifecycleBookChange,
   });
-  const quoteStore = useBookQuotes(book.id, userId, previewMode);
+  const quoteStore = useBookQuotes(book.id, userId, previewMode, deviceMode);
   const highlightedAttempt =
     reading.attempts.find((attempt) => !attempt.completed_at) ??
     reading.attempts[0];

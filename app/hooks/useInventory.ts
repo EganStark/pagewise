@@ -7,8 +7,14 @@ import {
   type InventoryItem,
 } from "../lib/inventory";
 import { supabase } from "../lib/supabase";
+import {
+  createDeviceInventory,
+  deleteDeviceInventory,
+  listDeviceInventory,
+  updateDeviceInventory,
+} from "../lib/device-collections";
 
-export function useInventory(userId: string | null, previewMode: boolean) {
+export function useInventory(userId: string | null, previewMode: boolean, deviceMode = false) {
   const [items, setItems] = useState<InventoryItem[]>(
     previewMode ? PREVIEW_INVENTORY : [],
   );
@@ -16,6 +22,15 @@ export function useInventory(userId: string | null, previewMode: boolean) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceInventory().then((rows) => {
+        if (!active) return;
+        setItems(rows);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase || !userId) return;
     const client = supabase;
     let active = true;
@@ -37,9 +52,18 @@ export function useInventory(userId: string | null, previewMode: boolean) {
     return () => {
       active = false;
     };
-  }, [previewMode, userId]);
+  }, [deviceMode, previewMode, userId]);
 
   async function addItem(input: InventoryInput) {
+    if (deviceMode) {
+      try {
+        const item = await createDeviceInventory(input);
+        setItems((current) => [item, ...current]);
+        return { data: item, error: null };
+      } catch (deviceError) {
+        return { data: null, error: deviceError instanceof Error ? deviceError.message : "Could not save this copy." };
+      }
+    }
     if (previewMode) {
       const now = new Date().toISOString();
       const item: InventoryItem = {
@@ -66,6 +90,15 @@ export function useInventory(userId: string | null, previewMode: boolean) {
   }
 
   async function updateItem(id: string, changes: Partial<InventoryItem>) {
+    if (deviceMode) {
+      try {
+        await updateDeviceInventory(id, changes);
+        setItems((current) => current.map((item) => item.id === id ? { ...item, ...changes, updated_at: new Date().toISOString() } : item));
+        return null;
+      } catch (deviceError) {
+        return deviceError instanceof Error ? deviceError.message : "Could not update this copy.";
+      }
+    }
     if (previewMode) {
       setItems((current) =>
         current.map((item) =>
@@ -90,6 +123,15 @@ export function useInventory(userId: string | null, previewMode: boolean) {
 
   async function deleteItem(id: string) {
     const item = items.find((candidate) => candidate.id === id);
+    if (deviceMode) {
+      try {
+        await deleteDeviceInventory(id);
+        setItems((current) => current.filter((candidate) => candidate.id !== id));
+        return null;
+      } catch (deviceError) {
+        return deviceError instanceof Error ? deviceError.message : "Could not delete this copy.";
+      }
+    }
     if (previewMode) {
       setItems((current) => current.filter((candidate) => candidate.id !== id));
       if (item?.cover_image_url?.startsWith("blob:"))

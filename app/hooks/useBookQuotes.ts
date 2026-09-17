@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { BookQuote, QuoteInput } from "../lib/quotes";
 import { supabase } from "../lib/supabase";
+import { deleteDeviceQuote, listDeviceQuotes, saveDeviceQuote } from "../lib/device-collections";
 
 function previewQuotes(bookId: string): BookQuote[] {
   if (bookId !== "preview-2") return [];
@@ -24,6 +25,7 @@ export function useBookQuotes(
   bookId: string,
   userId: string | null,
   previewMode: boolean,
+  deviceMode = false,
 ) {
   const [quotes, setQuotes] = useState<BookQuote[]>(() =>
     previewMode ? previewQuotes(bookId) : [],
@@ -32,6 +34,15 @@ export function useBookQuotes(
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceQuotes(bookId).then((rows) => {
+        if (!active) return;
+        setQuotes(rows);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase) return;
     const client = supabase;
     let active = true;
@@ -50,7 +61,7 @@ export function useBookQuotes(
     return () => {
       active = false;
     };
-  }, [bookId, previewMode]);
+  }, [bookId, deviceMode, previewMode]);
   const saveQuote = useCallback(
     async (input: QuoteInput, id?: string) => {
       setWorking(true);
@@ -63,6 +74,15 @@ export function useBookQuotes(
       if (!clean.quote_text) {
         setWorking(false);
         return "Quote text is required.";
+      }
+      if (deviceMode) {
+        try {
+          const row = await saveDeviceQuote(bookId, clean, id);
+          setQuotes((current) => id ? current.map((quote) => quote.id === id ? { ...row, created_at: quote.created_at } : quote) : [...current, row]);
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not save the quote.";
+        } finally { setWorking(false); }
       }
       if (previewMode) {
         const now = new Date().toISOString();
@@ -116,11 +136,20 @@ export function useBookQuotes(
       );
       return null;
     },
-    [bookId, previewMode, userId],
+    [bookId, deviceMode, previewMode, userId],
   );
   const deleteQuote = useCallback(
     async (id: string) => {
       setWorking(true);
+      if (deviceMode) {
+        try {
+          await deleteDeviceQuote(id);
+          setQuotes((current) => current.filter((quote) => quote.id !== id));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not delete the quote.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setQuotes((current) => current.filter((quote) => quote.id !== id));
         setWorking(false);
@@ -140,7 +169,7 @@ export function useBookQuotes(
       setQuotes((current) => current.filter((quote) => quote.id !== id));
       return null;
     },
-    [bookId, previewMode],
+    [bookId, deviceMode, previewMode],
   );
   return { quotes, loading, working, error, saveQuote, deleteQuote };
 }

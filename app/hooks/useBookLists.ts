@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { BookList, ListMembership } from "../lib/book-lists";
 import { supabase } from "../lib/supabase";
+import {
+  createDeviceList,
+  deleteDeviceList,
+  listDeviceLists,
+  moveDeviceListBooks,
+  setDeviceBookLists,
+  updateDeviceList,
+} from "../lib/device-collections";
 
 const now = "2026-08-25T12:00:00Z";
 const previewLists: BookList[] = [
@@ -47,7 +55,7 @@ const previewMemberships: ListMembership[] = [
   },
 ];
 
-export function useBookLists(userId: string | null, previewMode: boolean) {
+export function useBookLists(userId: string | null, previewMode: boolean, deviceMode = false) {
   const [lists, setLists] = useState<BookList[]>(
     previewMode ? previewLists : [],
   );
@@ -59,6 +67,13 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (deviceMode) {
+      const rows = await listDeviceLists();
+      setLists(rows.lists);
+      setMemberships(rows.memberships);
+      setLoading(false);
+      return;
+    }
     if (previewMode || !supabase || !userId) return;
     const [listResult, membershipResult] = await Promise.all([
       supabase
@@ -76,9 +91,19 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
     setError(null);
     setLists((listResult.data ?? []) as BookList[]);
     setMemberships((membershipResult.data ?? []) as ListMembership[]);
-  }, [previewMode, userId]);
+  }, [deviceMode, previewMode, userId]);
 
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceLists().then((rows) => {
+        if (!active) return;
+        setLists(rows.lists);
+        setMemberships(rows.memberships);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase || !userId) return;
     const client = supabase;
     let active = true;
@@ -102,12 +127,21 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
     return () => {
       active = false;
     };
-  }, [previewMode, userId]);
+  }, [deviceMode, previewMode, userId]);
 
   const createList = useCallback(
     async (title: string, description: string) => {
       setWorking(true);
       setError(null);
+      if (deviceMode) {
+        try {
+          const row = await createDeviceList(title, description);
+          setLists((current) => [row, ...current]);
+          return { id: row.id, error: null };
+        } catch (deviceError) {
+          return { id: null, error: deviceError instanceof Error ? deviceError.message : "Could not create the list." };
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         const row: BookList = {
           id: crypto.randomUUID(),
@@ -139,7 +173,7 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
       setLists((current) => [result.data as BookList, ...current]);
       return { id: result.data.id as string, error: null };
     },
-    [previewMode, userId],
+    [deviceMode, previewMode, userId],
   );
 
   const updateList = useCallback(
@@ -149,6 +183,15 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
         title: title.trim(),
         description: description.trim() || null,
       };
+      if (deviceMode) {
+        try {
+          await updateDeviceList(id, title, description);
+          setLists((current) => current.map((list) => list.id === id ? { ...list, ...changes, updated_at: new Date().toISOString() } : list));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not update the list.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setLists((current) =>
           current.map((list) =>
@@ -172,12 +215,22 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
       );
       return null;
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
 
   const deleteList = useCallback(
     async (id: string) => {
       setWorking(true);
+      if (deviceMode) {
+        try {
+          await deleteDeviceList(id);
+          setLists((current) => current.filter((list) => list.id !== id));
+          setMemberships((current) => current.filter((item) => item.list_id !== id));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not delete the list.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setLists((current) => current.filter((list) => list.id !== id));
         setMemberships((current) =>
@@ -199,7 +252,7 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
       );
       return null;
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
 
   const setBookLists = useCallback(
@@ -210,6 +263,15 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
         .map((item) => item.list_id);
       const addIds = selectedIds.filter((id) => !currentIds.includes(id));
       const removeIds = currentIds.filter((id) => !selectedIds.includes(id));
+      if (deviceMode) {
+        try {
+          await setDeviceBookLists(bookId, selectedIds, memberships);
+          await refresh();
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not update list membership.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setMemberships((current) => [
           ...current.filter(
@@ -261,7 +323,7 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
       setWorking(false);
       return null;
     },
-    [memberships, previewMode, refresh, userId],
+    [deviceMode, memberships, previewMode, refresh, userId],
   );
 
   const moveBook = useCallback(
@@ -278,6 +340,15 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
         ...current.filter((item) => item.list_id !== listId),
         ...next,
       ]);
+      if (deviceMode) {
+        try {
+          await moveDeviceListBooks(listId, next);
+          return null;
+        } catch (deviceError) {
+          setMemberships(memberships);
+          return deviceError instanceof Error ? deviceError.message : "Could not reorder the list.";
+        }
+      }
       if (previewMode) return null;
       if (!supabase) return "Supabase is not configured.";
       const results = await Promise.all(
@@ -296,7 +367,7 @@ export function useBookLists(userId: string | null, previewMode: boolean) {
       }
       return null;
     },
-    [memberships, previewMode],
+    [deviceMode, memberships, previewMode],
   );
 
   return {
