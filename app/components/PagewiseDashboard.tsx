@@ -45,6 +45,7 @@ import { useProfileSettings } from "../hooks/useProfileSettings";
 import { useInventory } from "../hooks/useInventory";
 import { ProfileView } from "./ProfileView";
 import type { InternetSearchRequest } from "./InternetSearchView";
+import { useDeviceAccount } from "../hooks/useDeviceAccount";
 
 const SmartImportModal = lazy(() =>
   import("./SmartImportModal").then((module) => ({
@@ -175,6 +176,7 @@ export default function PagewiseDashboard({
     [bookStore.books, readingLogs.logs, streakFreeze.freezeDates],
   );
   const profile = useProfileSettings(userId, previewMode, stats.year, deviceMode);
+  const deviceAccount = useDeviceAccount(deviceMode);
   const currentBooks = useMemo(
     () =>
       bookStore.books.filter((book) => book.status === "reading").slice(0, 2),
@@ -396,8 +398,8 @@ export default function PagewiseDashboard({
             </button>
             {accountOpen && (
               <div className="account-menu">
-                <span>{previewMode ? "Preview mode" : "Signed in"}</span>
-                <strong>{profile.displayName || userEmail || "Local preview account"}</strong>
+                <span>{previewMode ? "Preview mode" : deviceMode ? (deviceAccount.email ? "Local + cloud" : "Local mode") : "Signed in"}</span>
+                <strong>{profile.displayName || userEmail || deviceAccount.email || "Reader"}</strong>
                 {profile.displayName && userEmail && <small>{userEmail}</small>}
                 {onSignOut && (
                   <button onClick={() => void onSignOut()}>
@@ -562,6 +564,7 @@ export default function PagewiseDashboard({
               onUploadAvatar={profile.uploadAvatar}
               onRemoveAvatar={profile.removeAvatar}
               onSignOut={onSignOut}
+              deviceAccount={deviceMode ? deviceAccount : undefined}
             />
           ) : (
             <div className="dashboard-home">

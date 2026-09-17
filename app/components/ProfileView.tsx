@@ -3,6 +3,7 @@ import {
   BookOpen,
   Camera,
   Check,
+  Cloud,
   LoaderCircle,
   LockKeyhole,
   LogOut,
@@ -10,6 +11,7 @@ import {
   Moon,
   Sun,
   Trash2,
+  UploadCloud,
   UserRound,
 } from "lucide-react";
 import Image from "next/image";
@@ -39,6 +41,17 @@ type Props = {
   onUploadAvatar: (file: File) => Promise<string | null>;
   onRemoveAvatar: () => Promise<string | null>;
   onSignOut?: () => void | Promise<void>;
+  deviceAccount?: {
+    configured: boolean;
+    email: string | null;
+    loading: boolean;
+    working: boolean;
+    error: string | null;
+    message: string | null;
+    signIn: (email: string, password: string) => Promise<string | null>;
+    signOut: () => Promise<void>;
+    upload: () => Promise<string | null>;
+  };
 };
 export function ProfileView({
   userId,
@@ -62,6 +75,7 @@ export function ProfileView({
   onUploadAvatar,
   onRemoveAvatar,
   onSignOut,
+  deviceAccount,
 }: Props) {
   const [target, setTarget] = useState(goalTarget);
   const [zone, setZone] = useState(timezone);
@@ -70,6 +84,8 @@ export function ProfileView({
   const [born, setBorn] = useState(birthYear?.toString() ?? "");
   const [about, setAbout] = useState(bio);
   const [personalMessage, setPersonalMessage] = useState<string | null>(null);
+  const [syncEmail, setSyncEmail] = useState("");
+  const [syncPassword, setSyncPassword] = useState("");
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setMessage(null);
@@ -271,19 +287,64 @@ export function ProfileView({
             <div>
               <LockKeyhole />
               <span>
-                <strong>Private account</strong>
-                <small>Your library belongs only to you.</small>
+                <strong>{deviceMode ? "Backup & sync account" : "Private account"}</strong>
+                <small>{deviceMode ? "Optional—local mode keeps working without it." : "Your library belongs only to you."}</small>
               </span>
             </div>
           </header>
           <div className="account-details">
-            <span>Email</span>
-            <strong>{email || (deviceMode ? "Stored on this device" : "Preview mode")}</strong>
+            <span>{deviceMode ? "Status" : "Email"}</span>
+            <strong>{deviceAccount?.email || email || (deviceMode ? "Stored only on this device" : "Preview mode")}</strong>
             <p>
               {deviceMode
                 ? "Books, diary entries, lists, reviews, and quotes stay in this app until you connect sync or restore a backup."
                 : "Books, diary entries, lists, reviews, and quotes are protected by account ownership rules."}
             </p>
+            {deviceMode && deviceAccount && !deviceAccount.email && (
+              <form
+                className="profile-form"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const result = await deviceAccount.signIn(syncEmail, syncPassword);
+                  if (!result) setSyncPassword("");
+                }}
+              >
+                <label>
+                  Email
+                  <input type="email" autoComplete="email" required value={syncEmail} onChange={(event) => setSyncEmail(event.target.value)} />
+                </label>
+                <label>
+                  Password
+                  <input type="password" autoComplete="current-password" required value={syncPassword} onChange={(event) => setSyncPassword(event.target.value)} />
+                </label>
+                <button className="button button-primary" disabled={deviceAccount.working || deviceAccount.loading}>
+                  {deviceAccount.working ? <LoaderCircle className="spin" size={16} /> : <Cloud size={16} />}
+                  Connect existing account
+                </button>
+              </form>
+            )}
+            {deviceMode && deviceAccount?.email && (
+              <div className="profile-form">
+                <p>Your phone remains the primary copy. Cloud data is merged only when you confirm.</p>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  disabled={deviceAccount.working}
+                  onClick={() => {
+                    if (window.confirm("Merge all local Pagewise records into this cloud account? Existing cloud records will be preserved."))
+                      void deviceAccount.upload();
+                  }}
+                >
+                  {deviceAccount.working ? <LoaderCircle className="spin" size={16} /> : <UploadCloud size={16} />}
+                  Merge local library to cloud
+                </button>
+                <button type="button" className="button button-secondary" disabled={deviceAccount.working} onClick={() => void deviceAccount.signOut()}>
+                  <LogOut size={15} /> Disconnect account
+                </button>
+              </div>
+            )}
+            {deviceAccount?.error && <p className="form-error">{deviceAccount.error}</p>}
+            {deviceAccount?.message && <p className="profile-success">{deviceAccount.message}</p>}
             {onSignOut && (
               <button
                 className="button button-quiet-danger"
