@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "work/**",
     ".wrangler/**",
+    "android/**/build/**",
+    "android/app/src/main/assets/public/**",
     "next-env.d.ts",
   ]),
 ]);

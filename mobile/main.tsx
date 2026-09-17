@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { AuthGate } from "../app/components/AuthGate";
+import PagewiseDashboard from "../app/components/PagewiseDashboard";
 import { initializeDeviceDatabase } from "../app/lib/device-db";
 import "../app/globals.css";
 
@@ -20,6 +20,6 @@ void initializeDeviceDatabase().catch((error: unknown) => {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthGate />
+    <PagewiseDashboard deviceMode />
   </React.StrictMode>,
 );

@@ -6,13 +6,35 @@ import { PREVIEW_BOOKS } from "../lib/books";
 import { compressCoverImage } from "../lib/cover-images";
 import { supabase } from "../lib/supabase";
 import { todayLocalDate } from "../lib/reading-attempts";
+import {
+  createDeviceBook,
+  deleteDeviceBook,
+  listDeviceBooks,
+  updateDeviceBook,
+} from "../lib/device-books";
 
-export function useBooks(userId: string | null, previewMode: boolean) {
+export function useBooks(
+  userId: string | null,
+  previewMode: boolean,
+  deviceMode = false,
+) {
   const [books, setBooks] = useState<Book[]>(previewMode ? PREVIEW_BOOKS : []);
   const [loading, setLoading] = useState(!previewMode);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (deviceMode) {
+      setLoading(true);
+      try {
+        setBooks(await listDeviceBooks());
+        setError(null);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Could not load the local library.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (previewMode) {
       setBooks((current) => (current.length ? current : PREVIEW_BOOKS));
       setLoading(false);
@@ -32,9 +54,32 @@ export function useBooks(userId: string | null, previewMode: boolean) {
     }
     setError(null);
     setBooks((data ?? []) as Book[]);
-  }, [previewMode, userId]);
+  }, [deviceMode, previewMode, userId]);
 
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceBooks()
+        .then((localBooks) => {
+          if (!active) return;
+          setBooks(localBooks);
+          setError(null);
+        })
+        .catch((loadError: unknown) => {
+          if (!active) return;
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Could not load the local library.",
+          );
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }
     if (previewMode || !supabase || !userId) return;
     const client = supabase;
     let active = true;
@@ -56,10 +101,19 @@ export function useBooks(userId: string | null, previewMode: boolean) {
     return () => {
       active = false;
     };
-  }, [previewMode, userId]);
+  }, [deviceMode, previewMode, refresh, userId]);
 
   const addBook = useCallback(
     async (input: BookInput) => {
+      if (deviceMode) {
+        try {
+          const book = await createDeviceBook(input);
+          setBooks((current) => [book, ...current]);
+          return { data: book, error: null };
+        } catch (createError) {
+          return { data: null, error: createError instanceof Error ? createError.message : "Could not save the book." };
+        }
+      }
       if (previewMode) {
         const now = new Date().toISOString();
         const previewBook: Book = {
@@ -136,11 +190,20 @@ export function useBooks(userId: string | null, previewMode: boolean) {
       setBooks((current) => [finalData as Book, ...current]);
       return { data: finalData as Book, error: null };
     },
-    [previewMode, userId],
+    [deviceMode, previewMode, userId],
   );
 
   const updateBook = useCallback(
     async (id: string, changes: Partial<Book>) => {
+      if (deviceMode) {
+        try {
+          await updateDeviceBook(id, changes);
+          setBooks((current) => current.map((book) => book.id === id ? { ...book, ...changes, updated_at: new Date().toISOString() } : book));
+          return null;
+        } catch (updateError) {
+          return updateError instanceof Error ? updateError.message : "Could not update the book.";
+        }
+      }
       if (previewMode) {
         setBooks((current) =>
           current.map((book) =>
@@ -164,7 +227,7 @@ export function useBooks(userId: string | null, previewMode: boolean) {
       );
       return null;
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
 
   const patchBookLocal = useCallback((id: string, changes: Partial<Book>) => {
@@ -179,6 +242,15 @@ export function useBooks(userId: string | null, previewMode: boolean) {
 
   const deleteBook = useCallback(
     async (id: string) => {
+      if (deviceMode) {
+        try {
+          await deleteDeviceBook(id);
+          setBooks((current) => current.filter((book) => book.id !== id));
+          return null;
+        } catch (deleteError) {
+          return deleteError instanceof Error ? deleteError.message : "Could not delete the book.";
+        }
+      }
       if (previewMode) {
         setBooks((current) => {
           const deleted = current.find((book) => book.id === id);
@@ -202,14 +274,14 @@ export function useBooks(userId: string | null, previewMode: boolean) {
       setBooks((current) => current.filter((book) => book.id !== id));
       return null;
     },
-    [books, previewMode],
+    [books, deviceMode, previewMode],
   );
 
   const uploadCover = useCallback(
     async (file: File) => {
       try {
         const compressed = await compressCoverImage(file);
-        if (previewMode)
+        if (previewMode || deviceMode)
           return {
             url: URL.createObjectURL(compressed),
             path: null,
@@ -245,16 +317,16 @@ export function useBooks(userId: string | null, previewMode: boolean) {
         };
       }
     },
-    [previewMode, userId],
+    [deviceMode, previewMode, userId],
   );
 
   const discardUploadedCover = useCallback(
     async (path: string | null, url?: string | null) => {
       if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
-      if (!previewMode && path && supabase)
+      if (!previewMode && !deviceMode && path && supabase)
         await supabase.storage.from("book-covers").remove([path]);
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
 
   const replaceCover = useCallback(

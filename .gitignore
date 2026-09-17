@@ -44,5 +44,6 @@ next-env.d.ts
 /supabase/.temp/
 /mobile-dist/
 /android/.gradle/
+/android/.idea/
+/android/**/build/
 /android/local.properties
-/android/app/build/

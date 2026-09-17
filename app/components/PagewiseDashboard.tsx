@@ -118,6 +118,7 @@ function BookCover({
 
 type PagewiseDashboardProps = {
   previewMode?: boolean;
+  deviceMode?: boolean;
   userId?: string | null;
   userEmail?: string | null;
   onSignOut?: () => void | Promise<void>;
@@ -125,11 +126,12 @@ type PagewiseDashboardProps = {
 
 export default function PagewiseDashboard({
   previewMode = false,
+  deviceMode = false,
   userId = null,
   userEmail,
   onSignOut,
 }: PagewiseDashboardProps) {
-  const [active, setActive] = useState("Home");
+  const [active, setActive] = useState(deviceMode ? "Library" : "Home");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [addBookOpen, setAddBookOpen] = useState(false);
@@ -150,7 +152,7 @@ export default function PagewiseDashboard({
   const [internetSearch, setInternetSearch] =
     useState<InternetSearchRequest | null>(null);
   const [searchReturnActive, setSearchReturnActive] = useState("Home");
-  const bookStore = useBooks(userId, previewMode);
+  const bookStore = useBooks(userId, previewMode, deviceMode);
   const inventory = useInventory(userId, previewMode);
   const readingLogs = useReadingLogs(
     bookStore.books,
