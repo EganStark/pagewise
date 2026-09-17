@@ -24,6 +24,7 @@ export type PagewiseBackup = {
   exportedAt: string;
   appVersion: string;
   data: PagewiseBackupData;
+  files?: Array<{ path: string; data: string }>;
 };
 
 export type BackupCounts = Omit<
@@ -131,6 +132,25 @@ export function validatePagewiseBackup(input: unknown): BackupValidation {
   if (errors.length) return { valid: false, errors };
 
   const backupData = { ...data, inventoryItems } as PagewiseBackupData;
+  if (input.files !== undefined) {
+    if (!Array.isArray(input.files) || input.files.length > 500)
+      errors.push("Backup files must be a list of at most 500 images.");
+    else {
+      let encodedSize = 0;
+      input.files.forEach((file, index) => {
+        if (!isObject(file) || typeof file.path !== "string" || typeof file.data !== "string") {
+          errors.push(`Backup image ${index + 1} is invalid.`);
+          return;
+        }
+        const safePath = /^(covers|avatars)\/[a-zA-Z0-9-]+\.(jpg|png|webp)$/i.test(file.path);
+        if (!safePath) errors.push(`Backup image ${index + 1} has an unsafe path.`);
+        encodedSize += file.data.length;
+      });
+      if (encodedSize > 100 * 1024 * 1024)
+        errors.push("Embedded backup images exceed the 100 MB safety limit.");
+    }
+  }
+  if (errors.length) return { valid: false, errors: errors.slice(0, 20) };
   const ids = (rows: BackupRow[], label: string) => {
     const found = new Set<string>();
     rows.forEach((row, index) => {
@@ -208,7 +228,12 @@ export function validatePagewiseBackup(input: unknown): BackupValidation {
 export async function createPagewiseBackup(
   userId: string | null,
   previewMode: boolean,
+  deviceMode = false,
 ): Promise<PagewiseBackup> {
+  if (deviceMode) {
+    const { createDeviceBackup } = await import("./device-backup");
+    return createDeviceBackup();
+  }
   if (previewMode) {
     return {
       format: BACKUP_FORMAT,
@@ -290,7 +315,12 @@ export async function restorePagewiseBackup(
   backup: PagewiseBackup,
   mode: ImportMode,
   previewMode: boolean,
+  deviceMode = false,
 ) {
+  if (deviceMode) {
+    const { restoreDeviceBackup } = await import("./device-backup");
+    return restoreDeviceBackup(backup, mode);
+  }
   if (previewMode)
     return {
       mode,

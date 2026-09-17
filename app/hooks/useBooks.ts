@@ -12,6 +12,7 @@ import {
   listDeviceBooks,
   updateDeviceBook,
 } from "../lib/device-books";
+import { deleteDeviceFile, saveDeviceImage } from "../lib/device-files";
 
 export function useBooks(
   userId: string | null,
@@ -281,7 +282,11 @@ export function useBooks(
     async (file: File) => {
       try {
         const compressed = await compressCoverImage(file);
-        if (previewMode || deviceMode)
+        if (deviceMode) {
+          const saved = await saveDeviceImage(compressed, "covers");
+          return { url: saved.url, path: saved.path, error: null };
+        }
+        if (previewMode)
           return {
             url: URL.createObjectURL(compressed),
             path: null,
@@ -323,6 +328,7 @@ export function useBooks(
   const discardUploadedCover = useCallback(
     async (path: string | null, url?: string | null) => {
       if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+      if (deviceMode && path) await deleteDeviceFile(path);
       if (!previewMode && !deviceMode && path && supabase)
         await supabase.storage.from("book-covers").remove([path]);
     },

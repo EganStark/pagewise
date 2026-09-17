@@ -21,9 +21,9 @@ import {
   type ImportMode,
 } from "../lib/backup";
 
-type Props = { userId: string | null; previewMode: boolean };
+type Props = { userId: string | null; previewMode: boolean; deviceMode?: boolean };
 
-export function BackupPanel({ userId, previewMode }: Props) {
+export function BackupPanel({ userId, previewMode, deviceMode = false }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +41,11 @@ export function BackupPanel({ userId, previewMode }: Props) {
     setWorking(true);
     setError(null);
     try {
-      const backup = await createPagewiseBackup(userId, previewMode);
-      downloadBackup(backup);
+      const backup = await createPagewiseBackup(userId, previewMode, deviceMode);
+      if (deviceMode) {
+        const { shareDeviceBackup } = await import("../lib/device-backup");
+        await shareDeviceBackup(backup);
+      } else downloadBackup(backup);
       setCounts(countBackupRecords(backup.data));
     } catch (cause) {
       setError(
@@ -57,10 +60,11 @@ export function BackupPanel({ userId, previewMode }: Props) {
 
   async function inspectFile(file: File) {
     setFileName(file.name);
-    if (file.size > 20 * 1024 * 1024) {
+    const maximumSize = deviceMode ? 120 : 20;
+    if (file.size > maximumSize * 1024 * 1024) {
       setValidation({
         valid: false,
-        errors: ["The backup is larger than the 20 MB safety limit."],
+        errors: [`The backup is larger than the ${maximumSize} MB safety limit.`],
       });
       return;
     }
@@ -89,10 +93,11 @@ export function BackupPanel({ userId, previewMode }: Props) {
         validation.backup,
         mode,
         previewMode,
+        deviceMode,
       );
       setRestored(result.records);
       setConfirmOpen(false);
-      if (!previewMode) window.setTimeout(() => window.location.reload(), 900);
+      if (!previewMode || deviceMode) window.setTimeout(() => window.location.reload(), 900);
     } catch (cause) {
       setRestoreError(
         cause instanceof Error
@@ -136,8 +141,9 @@ export function BackupPanel({ userId, previewMode }: Props) {
           <div className="backup-note">
             <strong>Cover note</strong>
             <span>
-              Cover URLs are preserved, but uploaded image files are not
-              embedded in V1.
+              {deviceMode
+                ? "Local covers and your profile photo are included in this backup."
+                : "Cover URLs are preserved, but uploaded image files are not embedded in V1."}
             </span>
           </div>
           {error && <p className="form-error">{error}</p>}
@@ -163,7 +169,11 @@ export function BackupPanel({ userId, previewMode }: Props) {
             ) : (
               <Download size={16} />
             )}
-            {working ? "Preparing backup…" : "Download JSON backup"}
+            {working
+              ? "Preparing backup…"
+              : deviceMode
+                ? "Save or share backup"
+                : "Download JSON backup"}
           </button>
           {previewMode && (
             <small className="preview-backup-note">
@@ -197,7 +207,7 @@ export function BackupPanel({ userId, previewMode }: Props) {
             <FileCheck2 size={19} />
             <span>
               <strong>{fileName || "Choose Pagewise backup"}</strong>
-              <small>JSON only · maximum 20 MB</small>
+              <small>JSON only · maximum {deviceMode ? 120 : 20} MB</small>
             </span>
           </button>
           {validation && !validation.valid && (

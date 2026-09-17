@@ -20,6 +20,7 @@ import { BackupPanel } from "./BackupPanel";
 type Props = {
   userId: string | null;
   previewMode: boolean;
+  deviceMode?: boolean;
   email?: string | null;
   year: number;
   completed: number;
@@ -42,6 +43,7 @@ type Props = {
 export function ProfileView({
   userId,
   previewMode,
+  deviceMode = false,
   email,
   year,
   completed,
@@ -146,8 +148,8 @@ export function ProfileView({
               </label>
               <label className="personal-profile-email">
                 Email
-                <input value={email || "Preview mode"} readOnly />
-                <small>Your sign-in email cannot be edited here.</small>
+                <input value={email || (deviceMode ? "Local profile" : "Preview mode")} readOnly />
+                <small>{deviceMode ? "Connect an account later to enable sync." : "Your sign-in email cannot be edited here."}</small>
               </label>
               <label className="personal-profile-bio">
                 About me <span>{about.length}/280</span>
@@ -263,7 +265,7 @@ export function ProfileView({
             ))}
           </div>
         </article>
-        <BackupPanel userId={userId} previewMode={previewMode} />
+        <BackupPanel userId={userId} previewMode={previewMode} deviceMode={deviceMode} />
         <article className="profile-panel account-panel">
           <header>
             <div>
@@ -276,10 +278,11 @@ export function ProfileView({
           </header>
           <div className="account-details">
             <span>Email</span>
-            <strong>{email || "Preview mode"}</strong>
+            <strong>{email || (deviceMode ? "Stored on this device" : "Preview mode")}</strong>
             <p>
-              Books, diary entries, lists, reviews, and quotes are protected by
-              account ownership rules.
+              {deviceMode
+                ? "Books, diary entries, lists, reviews, and quotes stay in this app until you connect sync or restore a backup."
+                : "Books, diary entries, lists, reviews, and quotes are protected by account ownership rules."}
             </p>
             {onSignOut && (
               <button

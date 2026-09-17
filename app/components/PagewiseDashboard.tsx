@@ -174,7 +174,7 @@ export default function PagewiseDashboard({
       ),
     [bookStore.books, readingLogs.logs, streakFreeze.freezeDates],
   );
-  const profile = useProfileSettings(userId, previewMode, stats.year);
+  const profile = useProfileSettings(userId, previewMode, stats.year, deviceMode);
   const currentBooks = useMemo(
     () =>
       bookStore.books.filter((book) => book.status === "reading").slice(0, 2),
@@ -543,6 +543,7 @@ export default function PagewiseDashboard({
               key={`${profile.goalTarget}-${profile.timezone}`}
               userId={userId}
               previewMode={previewMode}
+              deviceMode={deviceMode}
               email={userEmail}
               year={stats.year}
               completed={stats.completed}

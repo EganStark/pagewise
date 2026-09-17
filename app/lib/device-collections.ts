@@ -2,6 +2,7 @@ import type { BookList, ListMembership } from "./book-lists";
 import { getDeviceDatabase } from "./device-db";
 import type { InventoryInput, InventoryItem } from "./inventory";
 import type { BookQuote, QuoteInput } from "./quotes";
+import { deviceFileUrl } from "./device-files";
 
 async function db() {
   const database = await getDeviceDatabase();
@@ -168,16 +169,18 @@ const inventoryColumns = `id,pagewise_book_id,title,author,isbn,publisher,public
  purchase_price,currency,is_lent,lent_to,lent_at,due_date,notes,cover_image_url,
  cover_local_path,tags_json,created_at,updated_at`;
 
-function inventory(row: Record<string, unknown>): InventoryItem {
+async function inventory(row: Record<string, unknown>): Promise<InventoryItem> {
   let tags: string[] = [];
   try {
     const value: unknown = JSON.parse(String(row.tags_json ?? "[]"));
     if (Array.isArray(value)) tags = value.filter((tag): tag is string => typeof tag === "string");
   } catch { /* Invalid legacy tags become an empty list. */ }
+  const localPath = (row.cover_local_path as string | null) ?? null;
   return {
     ...row,
     user_id: "device",
-    cover_storage_path: (row.cover_local_path as string | null) ?? null,
+    cover_storage_path: localPath,
+    cover_image_url: localPath ? await deviceFileUrl(localPath) : (row.cover_image_url as string | null),
     is_lent: Boolean(row.is_lent),
     tags,
   } as InventoryItem;
@@ -188,7 +191,7 @@ export async function listDeviceInventory() {
   const result = await database.query(
     `SELECT ${inventoryColumns} FROM inventory_items WHERE deleted_at IS NULL ORDER BY updated_at DESC`,
   );
-  return (result.values ?? []).map(inventory);
+  return Promise.all((result.values ?? []).map(inventory));
 }
 
 export async function createDeviceInventory(input: InventoryInput) {

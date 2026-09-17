@@ -1,5 +1,6 @@
 import type { Book, BookInput, BookStatus } from "./books";
 import { getDeviceDatabase } from "./device-db";
+import { deviceFileUrl } from "./device-files";
 
 type DeviceBookRow = {
   id: string;
@@ -40,13 +41,15 @@ function parseTags(value: string) {
   }
 }
 
-function toBook(row: DeviceBookRow): Book {
+async function toBook(row: DeviceBookRow): Promise<Book> {
   return {
     id: row.id,
     user_id: "device",
     title: row.title,
     author: row.author,
-    cover_image_url: row.cover_image_url,
+    cover_image_url: row.cover_local_path
+      ? await deviceFileUrl(row.cover_local_path)
+      : row.cover_image_url,
     cover_storage_path: row.cover_local_path,
     cover_source: row.cover_source,
     open_library_work_key: row.open_library_work_key,
@@ -91,7 +94,7 @@ export async function listDeviceBooks() {
   const result = await database.query(
     `SELECT ${bookColumns} FROM books WHERE deleted_at IS NULL ORDER BY updated_at DESC`,
   );
-  return (result.values ?? []).map((row) => toBook(row as DeviceBookRow));
+  return Promise.all((result.values ?? []).map((row) => toBook(row as DeviceBookRow)));
 }
 
 export async function createDeviceBook(input: BookInput) {

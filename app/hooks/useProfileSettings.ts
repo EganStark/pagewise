@@ -1,6 +1,14 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import {
+  loadDeviceProfile,
+  removeDeviceAvatar,
+  saveDeviceAvatar,
+  saveDevicePersonalProfile,
+  saveDevicePreferences,
+  saveDeviceTheme,
+} from "../lib/device-profile";
 
 export type ThemePreference = "dark" | "light" | "system";
 export type PersonalProfile = {
@@ -17,6 +25,7 @@ export function useProfileSettings(
   userId: string | null,
   previewMode: boolean,
   year: number,
+  deviceMode = false,
 ) {
   const [settings, setSettings] = useState<Settings>({
     theme: "dark",
@@ -52,6 +61,24 @@ export function useProfileSettings(
     };
   }, []);
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void loadDeviceProfile(year).then((profile) => {
+        if (!active) return;
+        setSettings({
+          theme: profile.theme,
+          timezone: profile.timezone,
+          displayName: profile.displayName,
+          birthYear: profile.birthYear,
+          bio: profile.bio,
+          avatarPath: profile.avatarPath,
+          avatarUrl: profile.avatarUrl,
+        });
+        setGoalTarget(profile.goalTarget);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase || !userId) return;
     const client = supabase;
     let active = true;
@@ -98,7 +125,7 @@ export function useProfileSettings(
     return () => {
       active = false;
     };
-  }, [previewMode, userId, year]);
+  }, [deviceMode, previewMode, userId, year]);
   useEffect(() => {
     if (!themeInitialized) return;
     const root = document.documentElement;
@@ -126,6 +153,15 @@ export function useProfileSettings(
     async (theme: ThemePreference) => {
       const previous = settings.theme;
       setSettings((current) => ({ ...current, theme }));
+      if (deviceMode) {
+        try {
+          await saveDeviceTheme(theme);
+          return null;
+        } catch (deviceError) {
+          setSettings((current) => ({ ...current, theme: previous }));
+          return deviceError instanceof Error ? deviceError.message : "Could not save the theme.";
+        }
+      }
       if (previewMode) return null;
       if (!supabase || !userId) return "Sign in is required.";
       const result = await supabase
@@ -138,7 +174,7 @@ export function useProfileSettings(
       }
       return null;
     },
-    [previewMode, settings.theme, userId],
+    [deviceMode, previewMode, settings.theme, userId],
   );
   const saveProfile = useCallback(
     async (target: number, timezone: string) => {
@@ -156,6 +192,16 @@ export function useProfileSettings(
       } catch {
         setWorking(false);
         return "Enter a valid timezone such as Asia/Dhaka.";
+      }
+      if (deviceMode) {
+        try {
+          await saveDevicePreferences(year, target, cleanTimezone);
+          setGoalTarget(target);
+          setSettings((current) => ({ ...current, timezone: cleanTimezone }));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not save preferences.";
+        } finally { setWorking(false); }
       }
       if (previewMode) {
         setGoalTarget(target);
@@ -186,7 +232,7 @@ export function useProfileSettings(
       setSettings((current) => ({ ...current, timezone: cleanTimezone }));
       return null;
     },
-    [previewMode, userId, year],
+    [deviceMode, previewMode, userId, year],
   );
   const savePersonalProfile = useCallback(
     async (displayName: string, birthYear: number | null, bio: string) => {
@@ -200,6 +246,15 @@ export function useProfileSettings(
         return `Birth year must be between 1900 and ${currentYear}.`;
       setWorking(true);
       setError(null);
+      if (deviceMode) {
+        try {
+          await saveDevicePersonalProfile(cleanName, birthYear, cleanBio);
+          setSettings((current) => ({ ...current, displayName: cleanName, birthYear, bio: cleanBio }));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not save your profile.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setSettings((current) => ({ ...current, displayName: cleanName, birthYear, bio: cleanBio }));
         setWorking(false);
@@ -218,12 +273,22 @@ export function useProfileSettings(
       setSettings((current) => ({ ...current, displayName: cleanName, birthYear, bio: cleanBio }));
       return null;
     },
-    [previewMode, userId],
+    [deviceMode, previewMode, userId],
   );
   const uploadAvatar = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) return "Choose an image file.";
       if (file.size > 5 * 1024 * 1024) return "Profile photos must be 5 MB or smaller.";
+      if (deviceMode) {
+        setWorking(true);
+        try {
+          const saved = await saveDeviceAvatar(file, settings.avatarPath);
+          setSettings((current) => ({ ...current, avatarPath: saved.path, avatarUrl: saved.url }));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not save the profile photo.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setSettings((current) => ({ ...current, avatarUrl: URL.createObjectURL(file) }));
         return null;
@@ -256,9 +321,19 @@ export function useProfileSettings(
       setWorking(false);
       return signed.error?.message ?? null;
     },
-    [previewMode, settings.avatarPath, userId],
+    [deviceMode, previewMode, settings.avatarPath, userId],
   );
   const removeAvatar = useCallback(async () => {
+    if (deviceMode) {
+      setWorking(true);
+      try {
+        await removeDeviceAvatar(settings.avatarPath);
+        setSettings((current) => ({ ...current, avatarPath: null, avatarUrl: null }));
+        return null;
+      } catch (deviceError) {
+        return deviceError instanceof Error ? deviceError.message : "Could not remove the profile photo.";
+      } finally { setWorking(false); }
+    }
     if (previewMode) {
       setSettings((current) => ({ ...current, avatarPath: null, avatarUrl: null }));
       return null;
@@ -272,7 +347,7 @@ export function useProfileSettings(
     if (result.error) return result.error.message;
     setSettings((current) => ({ ...current, avatarPath: null, avatarUrl: null }));
     return null;
-  }, [previewMode, settings.avatarPath, userId]);
+  }, [deviceMode, previewMode, settings.avatarPath, userId]);
   return {
     ...settings,
     goalTarget,
