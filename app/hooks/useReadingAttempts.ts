@@ -5,10 +5,18 @@ import type { Book, BookStatus } from "../lib/books";
 import type { AttemptDetails, ReadingAttempt } from "../lib/reading-attempts";
 import { todayLocalDate } from "../lib/reading-attempts";
 import { supabase } from "../lib/supabase";
+import {
+  finishDeviceAttempt,
+  listDeviceAttempts,
+  setDeviceReadingStatus,
+  startDeviceAttempt,
+  updateDeviceAttempt,
+} from "../lib/device-reading";
 
 type UseReadingAttemptsOptions = {
   book: Book;
   previewMode: boolean;
+  deviceMode?: boolean;
   onBookChange: (changes: Partial<Book>) => void;
 };
 
@@ -35,6 +43,7 @@ function previewAttemptFor(book: Book): ReadingAttempt[] {
 export function useReadingAttempts({
   book,
   previewMode,
+  deviceMode = false,
   onBookChange,
 }: UseReadingAttemptsOptions) {
   const [attempts, setAttempts] = useState<ReadingAttempt[]>(() =>
@@ -45,6 +54,11 @@ export function useReadingAttempts({
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (deviceMode) {
+      setAttempts(await listDeviceAttempts(book.id));
+      setLoading(false);
+      return;
+    }
     if (previewMode || !supabase) return;
     const { data, error: queryError } = await supabase
       .from("reading_attempts")
@@ -58,9 +72,18 @@ export function useReadingAttempts({
     }
     setError(null);
     setAttempts((data ?? []) as ReadingAttempt[]);
-  }, [book.id, previewMode]);
+  }, [book.id, deviceMode, previewMode]);
 
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceAttempts(book.id).then((rows) => {
+        if (!active) return;
+        setAttempts(rows);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase) return;
     let active = true;
     const client = supabase;
@@ -82,11 +105,26 @@ export function useReadingAttempts({
     return () => {
       active = false;
     };
-  }, [book.id, previewMode]);
+  }, [book.id, deviceMode, previewMode]);
 
   const startOrResume = useCallback(async () => {
     setWorking(true);
     setError(null);
+    if (deviceMode) {
+      try {
+        const created = await startDeviceAttempt(book);
+        setAttempts(await listDeviceAttempts(book.id));
+        onBookChange({
+          status: "reading",
+          active_attempt_id: created.id,
+          ...(book.active_attempt_id ? {} : { current_page: 0 }),
+        });
+        return true;
+      } catch (deviceError) {
+        setError(deviceError instanceof Error ? deviceError.message : "Could not start reading.");
+        return false;
+      } finally { setWorking(false); }
+    }
     if (previewMode) {
       const activeAttempt = attempts.find((attempt) => !attempt.completed_at);
       if (!activeAttempt) {
@@ -146,9 +184,9 @@ export function useReadingAttempts({
     return true;
   }, [
     attempts,
-    book.active_attempt_id,
-    book.id,
+    book,
     onBookChange,
+    deviceMode,
     previewMode,
     refresh,
   ]);
@@ -157,6 +195,16 @@ export function useReadingAttempts({
     async (status: Extract<BookStatus, "on_hold" | "dropped">) => {
       setWorking(true);
       setError(null);
+      if (deviceMode) {
+        try {
+          await setDeviceReadingStatus(book.id, status);
+          onBookChange({ status });
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not change reading status.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         onBookChange({ status });
         setWorking(false);
@@ -179,7 +227,7 @@ export function useReadingAttempts({
       onBookChange({ status });
       return true;
     },
-    [book.id, onBookChange, previewMode],
+    [book.id, deviceMode, onBookChange, previewMode],
   );
 
   const finish = useCallback(
@@ -187,6 +235,21 @@ export function useReadingAttempts({
       setWorking(true);
       setError(null);
       const completedAt = details.completed_at ?? todayLocalDate();
+      if (deviceMode) {
+        try {
+          await finishDeviceAttempt(book, { ...details, completed_at: completedAt });
+          setAttempts(await listDeviceAttempts(book.id));
+          onBookChange({
+            status: "completed",
+            active_attempt_id: null,
+            ...(book.total_pages ? { current_page: book.total_pages } : {}),
+          });
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not finish this book.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         let nextAttempts = attempts;
         const activeAttempt = attempts.find((attempt) => !attempt.completed_at);
@@ -253,13 +316,23 @@ export function useReadingAttempts({
       await refresh();
       return true;
     },
-    [attempts, book.id, book.total_pages, onBookChange, previewMode, refresh],
+    [attempts, book, deviceMode, onBookChange, previewMode, refresh],
   );
 
   const updateAttempt = useCallback(
     async (attemptId: string, details: AttemptDetails) => {
       setWorking(true);
       setError(null);
+      if (deviceMode) {
+        try {
+          await updateDeviceAttempt(attemptId, details);
+          setAttempts(await listDeviceAttempts(book.id));
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not update reading history.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setAttempts((current) =>
           current.map((attempt) =>
@@ -295,7 +368,7 @@ export function useReadingAttempts({
       );
       return true;
     },
-    [book.id, previewMode],
+    [book.id, deviceMode, previewMode],
   );
 
   return {

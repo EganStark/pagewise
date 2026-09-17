@@ -5,6 +5,11 @@ import type { Book } from "../lib/books";
 import type { ReadingLog, ReadingLogInput } from "../lib/reading-logs";
 import { pagesFromRange } from "../lib/reading-logs";
 import { supabase } from "../lib/supabase";
+import {
+  deleteDeviceLog,
+  listDeviceLogs,
+  saveDeviceLog,
+} from "../lib/device-reading";
 
 const previewLogs: ReadingLog[] = [
   {
@@ -65,6 +70,7 @@ export function useReadingLogs(
   books: Book[],
   previewMode: boolean,
   onBookChange: (id: string, changes: Partial<Book>) => void,
+  deviceMode = false,
 ) {
   const [logs, setLogs] = useState<ReadingLog[]>(
     previewMode ? previewLogs : [],
@@ -74,6 +80,11 @@ export function useReadingLogs(
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (deviceMode) {
+      setLogs(await listDeviceLogs());
+      setLoading(false);
+      return;
+    }
     if (previewMode || !supabase) return;
     const { data, error: queryError } = await supabase
       .from("reading_logs")
@@ -87,9 +98,18 @@ export function useReadingLogs(
     }
     setError(null);
     setLogs((data ?? []) as ReadingLog[]);
-  }, [previewMode]);
+  }, [deviceMode, previewMode]);
 
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceLogs().then((rows) => {
+        if (!active) return;
+        setLogs(rows);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase) return;
     let active = true;
     const client = supabase;
@@ -107,7 +127,7 @@ export function useReadingLogs(
     return () => {
       active = false;
     };
-  }, [previewMode]);
+  }, [deviceMode, previewMode]);
 
   const saveLog = useCallback(
     async (input: ReadingLogInput, existingId?: string) => {
@@ -130,6 +150,21 @@ export function useReadingLogs(
       ) {
         setWorking(false);
         return `End page cannot exceed ${book.total_pages}.`;
+      }
+      if (deviceMode) {
+        try {
+          const row = await saveDeviceLog(input, book.active_attempt_id, existingId);
+          setLogs((current) =>
+            existingId
+              ? current.map((item) => item.id === existingId ? { ...row, created_at: item.created_at } : item)
+              : [row, ...current],
+          );
+          if (input.end_page !== null && input.end_page > book.current_page)
+            onBookChange(book.id, { current_page: input.end_page });
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not save this reading log.";
+        } finally { setWorking(false); }
       }
       if (previewMode) {
         const now = new Date().toISOString();
@@ -199,12 +234,21 @@ export function useReadingLogs(
       setWorking(false);
       return null;
     },
-    [books, onBookChange, previewMode, refresh],
+    [books, deviceMode, onBookChange, previewMode, refresh],
   );
 
   const deleteLog = useCallback(
     async (id: string) => {
       setWorking(true);
+      if (deviceMode) {
+        try {
+          await deleteDeviceLog(id);
+          setLogs((current) => current.filter((item) => item.id !== id));
+          return null;
+        } catch (deviceError) {
+          return deviceError instanceof Error ? deviceError.message : "Could not delete this reading log.";
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setLogs((current) => current.filter((log) => log.id !== id));
         setWorking(false);
@@ -223,7 +267,7 @@ export function useReadingLogs(
       setLogs((current) => current.filter((log) => log.id !== id));
       return null;
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
 
   return { logs, loading, working, error, saveLog, deleteLog };

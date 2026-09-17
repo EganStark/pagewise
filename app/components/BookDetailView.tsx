@@ -45,6 +45,7 @@ type BookDetailViewProps = {
   onReplaceCover: (book: Book, file: File) => Promise<string | null>;
   onRemoveCover: (book: Book) => Promise<string | null>;
   previewMode: boolean;
+  deviceMode?: boolean;
   onLifecycleBookChange: (changes: Partial<Book>) => void;
   onQuickLog: () => void;
   onAddToList: () => void;
@@ -90,6 +91,7 @@ export function BookDetailView({
   onReplaceCover,
   onRemoveCover,
   previewMode,
+  deviceMode = false,
   onLifecycleBookChange,
   onQuickLog,
   onAddToList,
@@ -123,6 +125,7 @@ export function BookDetailView({
   const reading = useReadingAttempts({
     book,
     previewMode,
+    deviceMode,
     onBookChange: onLifecycleBookChange,
   });
   const quoteStore = useBookQuotes(book.id, userId, previewMode);

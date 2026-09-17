@@ -4,6 +4,12 @@ import type { AttemptDetails, ReadingAttempt } from "../lib/reading-attempts";
 import { todayLocalDate } from "../lib/reading-attempts";
 import type { Book } from "../lib/books";
 import { supabase } from "../lib/supabase";
+import {
+  deleteDeviceAttempt,
+  finishDeviceAttempt,
+  listDeviceAttempts,
+  updateDeviceAttempt,
+} from "../lib/device-reading";
 
 const previewAttempts: ReadingAttempt[] = [
   {
@@ -47,7 +53,7 @@ const previewAttempts: ReadingAttempt[] = [
   },
 ];
 
-export function useCompletedAttempts(previewMode: boolean) {
+export function useCompletedAttempts(previewMode: boolean, deviceMode = false) {
   const [attempts, setAttempts] = useState<ReadingAttempt[]>(
     previewMode ? previewAttempts : [],
   );
@@ -55,6 +61,11 @@ export function useCompletedAttempts(previewMode: boolean) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
+    if (deviceMode) {
+      setAttempts(await listDeviceAttempts(undefined, true));
+      setLoading(false);
+      return;
+    }
     if (previewMode || !supabase) return;
     const result = await supabase
       .from("reading_attempts")
@@ -67,8 +78,17 @@ export function useCompletedAttempts(previewMode: boolean) {
       setError(null);
       setAttempts((result.data ?? []) as ReadingAttempt[]);
     }
-  }, [previewMode]);
+  }, [deviceMode, previewMode]);
   useEffect(() => {
+    if (deviceMode) {
+      let active = true;
+      void listDeviceAttempts(undefined, true).then((rows) => {
+        if (!active) return;
+        setAttempts(rows);
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (previewMode || !supabase) return;
     const client = supabase;
     let active = true;
@@ -86,10 +106,20 @@ export function useCompletedAttempts(previewMode: boolean) {
     return () => {
       active = false;
     };
-  }, [previewMode]);
+  }, [deviceMode, previewMode]);
   const updateAttempt = useCallback(
     async (id: string, details: AttemptDetails) => {
       setWorking(true);
+      if (deviceMode) {
+        try {
+          await updateDeviceAttempt(id, details);
+          await refresh();
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not update reading history.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setAttempts((current) =>
           current.map((attempt) =>
@@ -126,7 +156,7 @@ export function useCompletedAttempts(previewMode: boolean) {
       );
       return true;
     },
-    [previewMode],
+    [deviceMode, previewMode, refresh],
   );
   const recordAttempt = useCallback((attempt: ReadingAttempt) => {
     if (!attempt.completed_at) return;
@@ -140,6 +170,16 @@ export function useCompletedAttempts(previewMode: boolean) {
     async (id: string) => {
       setWorking(true);
       setError(null);
+      if (deviceMode) {
+        try {
+          await deleteDeviceAttempt(id);
+          setAttempts((current) => current.filter((item) => item.id !== id));
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not delete reading history.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         setAttempts((current) =>
           current.filter((attempt) => attempt.id !== id),
@@ -164,13 +204,23 @@ export function useCompletedAttempts(previewMode: boolean) {
       setAttempts((current) => current.filter((attempt) => attempt.id !== id));
       return true;
     },
-    [previewMode],
+    [deviceMode, previewMode],
   );
   const logFinishedBook = useCallback(
     async (book: Book, details: AttemptDetails) => {
       setWorking(true);
       setError(null);
       const completedAt = details.completed_at ?? todayLocalDate();
+      if (deviceMode) {
+        try {
+          const finished = await finishDeviceAttempt(book, { ...details, completed_at: completedAt });
+          recordAttempt(finished);
+          return true;
+        } catch (deviceError) {
+          setError(deviceError instanceof Error ? deviceError.message : "Could not save the finished book.");
+          return false;
+        } finally { setWorking(false); }
+      }
       if (previewMode) {
         const now = new Date().toISOString();
         const nextNumber =
@@ -220,7 +270,7 @@ export function useCompletedAttempts(previewMode: boolean) {
       await refresh();
       return true;
     },
-    [attempts, previewMode, refresh],
+    [attempts, deviceMode, previewMode, recordAttempt, refresh],
   );
   return {
     attempts,

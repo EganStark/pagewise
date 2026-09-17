@@ -158,10 +158,11 @@ export default function PagewiseDashboard({
     bookStore.books,
     previewMode,
     bookStore.patchBookLocal,
+    deviceMode,
   );
   const bookLists = useBookLists(userId, previewMode);
   const searchableReviews = useSearchReviews(previewMode);
-  const completedAttempts = useCompletedAttempts(previewMode);
+  const completedAttempts = useCompletedAttempts(previewMode, deviceMode);
   const streakFreeze = useStreakFreeze(previewMode, userId);
   const stats = useMemo(
     () =>
@@ -431,11 +432,12 @@ export default function PagewiseDashboard({
                 book={selectedBook}
                 userId={userId}
                 previewMode={previewMode}
+                deviceMode={deviceMode}
                 lists={bookLists.lists}
                 memberships={bookLists.memberships}
                 onAttemptChange={(attempt) => {
                   completedAttempts.recordAttempt(attempt);
-                  if (!previewMode) void completedAttempts.refresh();
+                  if (!previewMode && !deviceMode) void completedAttempts.refresh();
                 }}
                 readingLogs={readingLogs.logs}
                 onBack={closeBook}

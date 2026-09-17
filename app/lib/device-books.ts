@@ -76,12 +76,13 @@ async function queueChange(
   entityId: string,
   operation: "create" | "update" | "delete",
   payload: object,
+  entityType = "book",
 ) {
   const database = await requireDatabase();
   await database.run(
     `INSERT INTO sync_outbox(entity_type,entity_id,operation,payload_json,created_at)
      VALUES (?,?,?,?,?)`,
-    ["book", entityId, operation, JSON.stringify(payload), new Date().toISOString()],
+    [entityType, entityId, operation, JSON.stringify(payload), new Date().toISOString()],
   );
 }
 
@@ -96,6 +97,8 @@ export async function listDeviceBooks() {
 export async function createDeviceBook(input: BookInput) {
   const database = await requireDatabase();
   const now = new Date().toISOString();
+  const attemptId = input.status === "want_to_read" ? null : crypto.randomUUID();
+  const completed = input.status === "completed";
   const book: Book = {
     id: crypto.randomUUID(),
     user_id: "device",
@@ -113,8 +116,8 @@ export async function createDeviceBook(input: BookInput) {
     isbn: input.isbn ?? null,
     status: input.status,
     is_favorite: false,
-    current_page: 0,
-    active_attempt_id: null,
+    current_page: completed ? (input.total_pages ?? 0) : 0,
+    active_attempt_id: completed ? null : attemptId,
     tags: input.tags ?? [],
     created_at: now,
     updated_at: now,
@@ -125,10 +128,26 @@ export async function createDeviceBook(input: BookInput) {
       book.id, book.title, book.author, book.cover_image_url,
       book.cover_storage_path, book.cover_source, book.open_library_work_key,
       book.open_library_edition_key, book.genre, book.total_pages,
-      book.publication_year, book.description, book.isbn, book.status, 0, 0,
-      null, JSON.stringify(book.tags), now, now,
+      book.publication_year, book.description, book.isbn, book.status, 0,
+      book.current_page, book.active_attempt_id, JSON.stringify(book.tags), now, now,
     ],
   );
+  if (attemptId) {
+    const localDate = now.slice(0, 10);
+    await database.run(
+      `INSERT INTO reading_attempts
+        (id,book_id,attempt_number,started_at,completed_at,rating_numeric,rating_tag,review,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [attemptId, book.id, 1, localDate, completed ? localDate : null, null, null, null, now, now],
+    );
+    await queueChange(attemptId, "create", {
+      id: attemptId,
+      book_id: book.id,
+      attempt_number: 1,
+      started_at: localDate,
+      completed_at: completed ? localDate : null,
+    }, "reading_attempt");
+  }
   await queueChange(book.id, "create", book);
   return book;
 }
