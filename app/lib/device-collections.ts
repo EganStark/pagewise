@@ -3,6 +3,7 @@ import { getDeviceDatabase } from "./device-db";
 import type { InventoryInput, InventoryItem } from "./inventory";
 import type { BookQuote, QuoteInput } from "./quotes";
 import { deviceFileUrl } from "./device-files";
+import { queueDeviceChange } from "./device-outbox";
 
 async function db() {
   const database = await getDeviceDatabase();
@@ -16,12 +17,7 @@ async function queue(
   operation: "create" | "update" | "delete",
   payload: object,
 ) {
-  const database = await db();
-  await database.run(
-    `INSERT INTO sync_outbox(entity_type,entity_id,operation,payload_json,created_at)
-     VALUES (?,?,?,?,?)`,
-    [type, id, operation, JSON.stringify(payload), new Date().toISOString()],
-  );
+  await queueDeviceChange(type, id, operation, payload);
 }
 
 export async function listDeviceLists() {

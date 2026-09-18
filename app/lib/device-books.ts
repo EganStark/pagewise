@@ -1,6 +1,7 @@
 import type { Book, BookInput, BookStatus } from "./books";
 import { getDeviceDatabase } from "./device-db";
 import { deviceFileUrl } from "./device-files";
+import { queueDeviceChange } from "./device-outbox";
 
 type DeviceBookRow = {
   id: string;
@@ -81,12 +82,7 @@ async function queueChange(
   payload: object,
   entityType = "book",
 ) {
-  const database = await requireDatabase();
-  await database.run(
-    `INSERT INTO sync_outbox(entity_type,entity_id,operation,payload_json,created_at)
-     VALUES (?,?,?,?,?)`,
-    [entityType, entityId, operation, JSON.stringify(payload), new Date().toISOString()],
-  );
+  await queueDeviceChange(entityType, entityId, operation, payload);
 }
 
 export async function listDeviceBooks() {

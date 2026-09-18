@@ -4,6 +4,7 @@ import type { AttemptDetails, ReadingAttempt } from "./reading-attempts";
 import { todayLocalDate } from "./reading-attempts";
 import type { ReadingLog, ReadingLogInput } from "./reading-logs";
 import { pagesFromRange } from "./reading-logs";
+import { queueDeviceChange } from "./device-outbox";
 
 async function db() {
   const database = await getDeviceDatabase();
@@ -25,12 +26,7 @@ async function outbox(
   operation: "create" | "update" | "delete",
   payload: object,
 ) {
-  const database = await db();
-  await database.run(
-    `INSERT INTO sync_outbox(entity_type,entity_id,operation,payload_json,created_at)
-     VALUES (?,?,?,?,?)`,
-    [entityType, entityId, operation, JSON.stringify(payload), new Date().toISOString()],
-  );
+  await queueDeviceChange(entityType, entityId, operation, payload);
 }
 
 export async function listDeviceAttempts(bookId?: string, completedOnly = false) {

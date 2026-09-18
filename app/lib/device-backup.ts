@@ -71,23 +71,43 @@ function value(row: Row, column: string) {
   return row[column] ?? null;
 }
 
-async function upsert(table: string, columns: string[], conflict: string[], row: Row) {
+async function upsert(table: string, columns: string[], conflict: string[], row: Row, preferNewer = false) {
   const database = await db();
   const updates = columns.filter((column) => !conflict.includes(column)).map((column) => `${column}=excluded.${column}`);
+  const freshness = preferNewer && columns.includes("updated_at")
+    ? ` WHERE excluded.updated_at >= ${table}.updated_at`
+    : "";
   await database.run(
-    `INSERT INTO ${table}(${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")}) ON CONFLICT(${conflict.join(",")}) DO UPDATE SET ${updates.join(",")}`,
+    `INSERT INTO ${table}(${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")}) ON CONFLICT(${conflict.join(",")}) DO UPDATE SET ${updates.join(",")}${freshness}`,
     columns.map((column) => value(row, column)),
   );
 }
 
-export async function restoreDeviceBackup(backup: PagewiseBackup, mode: ImportMode) {
+export async function restoreDeviceBackup(backup: PagewiseBackup, mode: ImportMode, preferNewer = false) {
   const database = await db();
   if (mode === "replace") {
     for (const table of ["sync_outbox","list_books","reading_logs","quotes","reading_attempts","inventory_items","lists","books","reading_goals","streak_freezes","user_settings"])
       await database.execute(`DELETE FROM ${table};`, true, false);
   }
-  for (const mapping of mappings)
-    for (const row of backup.data[mapping.key]) await upsert(mapping.table, mapping.columns, mapping.conflict, row);
+  const activeAttempts = new Map<string, { id: unknown; updatedAt: unknown }>();
+  for (const mapping of mappings) {
+    for (const sourceRow of backup.data[mapping.key]) {
+      const row = { ...sourceRow };
+      if (mapping.table === "books" && row.active_attempt_id) {
+        activeAttempts.set(String(row.id), { id: row.active_attempt_id, updatedAt: row.updated_at });
+        row.active_attempt_id = null;
+      }
+      await upsert(mapping.table, mapping.columns, mapping.conflict, row, preferNewer);
+    }
+  }
+  for (const [bookId, attempt] of activeAttempts) {
+    await database.run(
+      `UPDATE books SET active_attempt_id=? WHERE id=?
+       AND EXISTS (SELECT 1 FROM reading_attempts WHERE id=?)
+       AND (?=0 OR updated_at<=?)`,
+      [attempt.id, bookId, attempt.id, preferNewer ? 1 : 0, attempt.updatedAt ?? ""],
+    );
+  }
   const settings = backup.data.userSettings;
   const now = new Date().toISOString();
   const settingsRow: Row = {
@@ -96,9 +116,9 @@ export async function restoreDeviceBackup(backup: PagewiseBackup, mode: ImportMo
     streak_freeze_last_reset: settings.streak_freeze_last_reset ?? null,
     display_name: settings.display_name ?? "", birth_year: settings.birth_year ?? null,
     bio: settings.bio ?? "", avatar_local_path: settings.avatar_local_path ?? settings.avatar_path ?? null,
-    created_at: settings.created_at ?? now, updated_at: now,
+    created_at: settings.created_at ?? now, updated_at: settings.updated_at ?? now,
   };
-  await upsert("user_settings", ["id","theme","timezone","streak_freeze_available","streak_freeze_last_reset","display_name","birth_year","bio","avatar_local_path","created_at","updated_at"], ["id"], settingsRow);
+  await upsert("user_settings", ["id","theme","timezone","streak_freeze_available","streak_freeze_last_reset","display_name","birth_year","bio","avatar_local_path","created_at","updated_at"], ["id"], settingsRow, preferNewer);
   for (const file of backup.files ?? []) await writeDeviceFile(file.path, file.data);
   await database.execute("PRAGMA optimize;", true, false);
   return { mode, records: Object.values(countBackupRecords(backup.data)).reduce((sum, count) => sum + count, 0) };

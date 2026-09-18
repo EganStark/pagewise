@@ -1,8 +1,9 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState } from "react";
-import { uploadDeviceLibrary } from "../lib/device-sync";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DEVICE_CHANGE_EVENT } from "../lib/device-outbox";
+import { getDeviceSyncState, synchronizeDeviceLibrary, uploadDeviceLibrary } from "../lib/device-sync";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
 export function useDeviceAccount(enabled: boolean) {
@@ -11,6 +12,18 @@ export function useDeviceAccount(enabled: boolean) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [linked, setLinked] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const syncingRef = useRef(false);
+
+  const refreshSyncState = useCallback(async (userId?: string) => {
+    const state = await getDeviceSyncState();
+    setLinked(Boolean(userId && state.linkedUserId === userId));
+    setPendingCount(state.pendingCount);
+    setLastSyncedAt(state.lastSyncedAt);
+    return state;
+  }, []);
 
   useEffect(() => {
     if (!enabled || !supabase) {
@@ -33,6 +46,53 @@ export function useDeviceAccount(enabled: boolean) {
     };
   }, [enabled]);
 
+  const sync = useCallback(async (quiet = false) => {
+    if (!session?.user.id || syncingRef.current) return null;
+    const state = await refreshSyncState(session.user.id);
+    if (state.linkedUserId !== session.user.id) return null;
+    syncingRef.current = true;
+    setWorking(true);
+    if (!quiet) { setError(null); setMessage(null); }
+    try {
+      const result = await synchronizeDeviceLibrary(session.user.id);
+      setPendingCount(result.pendingCount);
+      setLastSyncedAt(result.syncedAt);
+      if (!quiet) setMessage(result.pushed ? `${result.pushed} pending changes synced.` : "Your phone and cloud library are up to date.");
+      return null;
+    } catch (cause) {
+      const text = cause instanceof Error ? cause.message : "Cloud sync failed.";
+      setError(text);
+      return text;
+    } finally {
+      syncingRef.current = false;
+      setWorking(false);
+    }
+  }, [refreshSyncState, session]);
+
+  useEffect(() => {
+    if (!enabled || !session?.user.id) return;
+    const userId = session.user.id;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const requestSync = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void sync(true), 1200);
+    };
+    timer = setTimeout(() => {
+      void refreshSyncState(userId).then((state) => {
+        if (state.linkedUserId === userId) requestSync();
+      });
+    }, 0);
+    window.addEventListener("online", requestSync);
+    window.addEventListener(DEVICE_CHANGE_EVENT, requestSync);
+    const interval = window.setInterval(requestSync, 60_000);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.clearInterval(interval);
+      window.removeEventListener("online", requestSync);
+      window.removeEventListener(DEVICE_CHANGE_EVENT, requestSync);
+    };
+  }, [enabled, refreshSyncState, session?.user.id, sync]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) return "Cloud accounts are not configured in this build.";
     setWorking(true);
@@ -45,9 +105,10 @@ export function useDeviceAccount(enabled: boolean) {
       return result.error.message;
     }
     setSession(result.data.session);
+    await refreshSyncState(result.data.session?.user.id);
     setMessage("Account connected. Your phone library has not been uploaded yet.");
     return null;
-  }, []);
+  }, [refreshSyncState]);
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
@@ -57,6 +118,7 @@ export function useDeviceAccount(enabled: boolean) {
     if (result.error) setError(result.error.message);
     else {
       setSession(null);
+      setLinked(false);
       setMessage("Account disconnected. Local data remains on this phone.");
     }
   }, []);
@@ -67,7 +129,9 @@ export function useDeviceAccount(enabled: boolean) {
     setError(null);
     try {
       const count = await uploadDeviceLibrary(session.user.id);
-      setMessage(`${count} local records merged into your cloud account.`);
+      await refreshSyncState(session.user.id);
+      setLinked(true);
+      setMessage(`${count} local records merged. Automatic sync is now on.`);
       return null;
     } catch (cause) {
       const text = cause instanceof Error ? cause.message : "Cloud upload failed.";
@@ -76,7 +140,7 @@ export function useDeviceAccount(enabled: boolean) {
     } finally {
       setWorking(false);
     }
-  }, [session]);
+  }, [refreshSyncState, session]);
 
   return {
     configured: isSupabaseConfigured,
@@ -86,8 +150,12 @@ export function useDeviceAccount(enabled: boolean) {
     working,
     error,
     message,
+    linked,
+    pendingCount,
+    lastSyncedAt,
     signIn,
     signOut,
     upload,
+    sync,
   };
 }

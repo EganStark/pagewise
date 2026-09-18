@@ -48,9 +48,13 @@ type Props = {
     working: boolean;
     error: string | null;
     message: string | null;
+    linked: boolean;
+    pendingCount: number;
+    lastSyncedAt: string | null;
     signIn: (email: string, password: string) => Promise<string | null>;
     signOut: () => Promise<void>;
     upload: () => Promise<string | null>;
+    sync: () => Promise<string | null>;
   };
 };
 export function ProfileView({
@@ -325,19 +329,33 @@ export function ProfileView({
             )}
             {deviceMode && deviceAccount?.email && (
               <div className="profile-form">
-                <p>Your phone remains the primary copy. Cloud data is merged only when you confirm.</p>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  disabled={deviceAccount.working}
-                  onClick={() => {
-                    if (window.confirm("Merge all local Pagewise records into this cloud account? Existing cloud records will be preserved."))
-                      void deviceAccount.upload();
-                  }}
-                >
-                  {deviceAccount.working ? <LoaderCircle className="spin" size={16} /> : <UploadCloud size={16} />}
-                  Merge local library to cloud
-                </button>
+                {deviceAccount.linked ? (
+                  <>
+                    <p>
+                      Automatic sync is on. {deviceAccount.pendingCount ? `${deviceAccount.pendingCount} change${deviceAccount.pendingCount === 1 ? "" : "s"} waiting.` : "No changes are waiting."}
+                      {deviceAccount.lastSyncedAt ? ` Last synced ${new Date(deviceAccount.lastSyncedAt).toLocaleString()}.` : ""}
+                    </p>
+                    <button type="button" className="button button-primary" disabled={deviceAccount.working} onClick={() => void deviceAccount.sync()}>
+                      {deviceAccount.working ? <LoaderCircle className="spin" size={16} /> : <Cloud size={16} />}
+                      Sync now
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p>Your phone remains the primary copy. Cloud data is merged only when you confirm.</p>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      disabled={deviceAccount.working}
+                      onClick={() => {
+                        if (window.confirm("Merge all local Pagewise records into this cloud account? Existing cloud records will be preserved.")) void deviceAccount.upload();
+                      }}
+                    >
+                      {deviceAccount.working ? <LoaderCircle className="spin" size={16} /> : <UploadCloud size={16} />}
+                      Merge local library to cloud
+                    </button>
+                  </>
+                )}
                 <button type="button" className="button button-secondary" disabled={deviceAccount.working} onClick={() => void deviceAccount.signOut()}>
                   <LogOut size={15} /> Disconnect account
                 </button>
