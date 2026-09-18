@@ -10,6 +10,19 @@ async function fileToBase64(file: Blob) {
   });
 }
 
+export async function deviceFileBlob(path: string) {
+  const base64 = await readDeviceFile(path);
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+  const extension = path.split(".").pop()?.toLowerCase();
+  const type = extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+  return new Blob([bytes], { type });
+}
+
+export async function writeDeviceBlob(path: string, file: Blob) {
+  await writeDeviceFile(path, await fileToBase64(file));
+  return { path, url: await deviceFileUrl(path) };
+}
+
 export async function deviceFileUrl(path: string | null) {
   if (!path) return null;
   const result = await Filesystem.getUri({ path, directory: Directory.Data });

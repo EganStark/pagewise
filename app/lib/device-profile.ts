@@ -1,6 +1,7 @@
 import type { ThemePreference } from "../hooks/useProfileSettings";
 import { getDeviceDatabase } from "./device-db";
 import { deleteDeviceFile, deviceFileUrl, saveDeviceImage } from "./device-files";
+import { queueDeviceChange } from "./device-outbox";
 
 export type DeviceProfile = {
   theme: ThemePreference;
@@ -53,7 +54,9 @@ export async function loadDeviceProfile(year: number): Promise<DeviceProfile> {
 export async function saveDeviceTheme(theme: ThemePreference) {
   const database = await db();
   await ensureSettings();
-  await database.run("UPDATE user_settings SET theme=?,updated_at=? WHERE id=1", [theme, new Date().toISOString()]);
+  const now = new Date().toISOString();
+  await database.run("UPDATE user_settings SET theme=?,updated_at=? WHERE id=1", [theme, now]);
+  await queueDeviceChange("user_settings", "1", "update", { theme, updated_at: now });
 }
 
 export async function saveDevicePreferences(year: number, target: number, timezone: string) {
@@ -66,22 +69,28 @@ export async function saveDevicePreferences(year: number, target: number, timezo
      ON CONFLICT(year) DO UPDATE SET target_books=excluded.target_books,updated_at=excluded.updated_at`,
     [crypto.randomUUID(), year, target, now, now],
   );
+  await queueDeviceChange("user_settings", "1", "update", { timezone, updated_at: now });
+  await queueDeviceChange("reading_goal", String(year), "create", { year, target_books: target, updated_at: now });
 }
 
 export async function saveDevicePersonalProfile(displayName: string, birthYear: number | null, bio: string) {
   const database = await db();
   await ensureSettings();
+  const now = new Date().toISOString();
   await database.run(
     "UPDATE user_settings SET display_name=?,birth_year=?,bio=?,updated_at=? WHERE id=1",
-    [displayName, birthYear, bio, new Date().toISOString()],
+    [displayName, birthYear, bio, now],
   );
+  await queueDeviceChange("user_settings", "1", "update", { display_name: displayName, birth_year: birthYear, bio, updated_at: now });
 }
 
 export async function saveDeviceAvatar(file: File, previousPath: string | null) {
   const database = await db();
   const saved = await saveDeviceImage(file, "avatars");
   await ensureSettings();
-  await database.run("UPDATE user_settings SET avatar_local_path=?,updated_at=? WHERE id=1", [saved.path, new Date().toISOString()]);
+  const now = new Date().toISOString();
+  await database.run("UPDATE user_settings SET avatar_local_path=?,updated_at=? WHERE id=1", [saved.path, now]);
+  await queueDeviceChange("user_settings", "1", "update", { avatar_local_path: saved.path, updated_at: now });
   await deleteDeviceFile(previousPath);
   return saved;
 }
@@ -89,6 +98,8 @@ export async function saveDeviceAvatar(file: File, previousPath: string | null) 
 export async function removeDeviceAvatar(path: string | null) {
   const database = await db();
   await ensureSettings();
-  await database.run("UPDATE user_settings SET avatar_local_path=NULL,updated_at=? WHERE id=1", [new Date().toISOString()]);
+  const now = new Date().toISOString();
+  await database.run("UPDATE user_settings SET avatar_local_path=NULL,updated_at=? WHERE id=1", [now]);
+  await queueDeviceChange("user_settings", "1", "update", { avatar_local_path: null, updated_at: now });
   await deleteDeviceFile(path);
 }
