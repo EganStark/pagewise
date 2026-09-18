@@ -1,10 +1,14 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
+import { App } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEVICE_CHANGE_EVENT } from "../lib/device-outbox";
 import { getDeviceSyncState, synchronizeDeviceLibrary, uploadDeviceLibrary } from "../lib/device-sync";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
+
+const ANDROID_AUTH_CALLBACK = "com.eganstark.pagewise://auth/callback";
 
 export function useDeviceAccount(enabled: boolean) {
   const [session, setSession] = useState<Session | null>(null);
@@ -45,6 +49,64 @@ export function useDeviceAccount(enabled: boolean) {
       data.subscription.unsubscribe();
     };
   }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled || !supabase) return;
+    const client = supabase;
+    let active = true;
+    let removeListener: (() => Promise<void>) | null = null;
+    let removeBrowserListener: (() => Promise<void>) | null = null;
+    const handleAuthUrl = async (value?: string) => {
+      if (!value?.startsWith(ANDROID_AUTH_CALLBACK)) return;
+      const url = new URL(value);
+      const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+      const oauthError = url.searchParams.get("error_description") ?? hash.get("error_description");
+      if (oauthError) {
+        if (active) {
+          setError(decodeURIComponent(oauthError.replaceAll("+", " ")));
+          setWorking(false);
+        }
+        return;
+      }
+      const code = url.searchParams.get("code");
+      if (!code) {
+        if (active) {
+          setError("Google sign-in returned without an authorization code.");
+          setWorking(false);
+        }
+        return;
+      }
+      const result = await client.auth.exchangeCodeForSession(code);
+      await Browser.close().catch(() => undefined);
+      if (!active) return;
+      setWorking(false);
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+      setSession(result.data.session);
+      const state = await refreshSyncState(result.data.session.user.id);
+      setMessage(state.linkedUserId === result.data.session.user.id
+        ? "Google account connected. Automatic sync is active."
+        : "Google account connected. Confirm the first cloud merge to enable sync.");
+    };
+    void App.addListener("appUrlOpen", ({ url }) => void handleAuthUrl(url)).then((handle) => {
+      if (active) removeListener = () => handle.remove();
+      else void handle.remove();
+    });
+    void Browser.addListener("browserFinished", () => {
+      if (active) setWorking(false);
+    }).then((handle) => {
+      if (active) removeBrowserListener = () => handle.remove();
+      else void handle.remove();
+    });
+    void App.getLaunchUrl().then((launch) => void handleAuthUrl(launch?.url));
+    return () => {
+      active = false;
+      if (removeListener) void removeListener();
+      if (removeBrowserListener) void removeBrowserListener();
+    };
+  }, [enabled, refreshSyncState]);
 
   const sync = useCallback(async (quiet = false) => {
     if (!session?.user.id || syncingRef.current) return null;
@@ -110,6 +172,25 @@ export function useDeviceAccount(enabled: boolean) {
     return null;
   }, [refreshSyncState]);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) return "Cloud accounts are not configured in this build.";
+    setWorking(true);
+    setError(null);
+    setMessage(null);
+    const result = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: ANDROID_AUTH_CALLBACK, skipBrowserRedirect: true },
+    });
+    if (result.error || !result.data.url) {
+      const text = result.error?.message ?? "Google sign-in could not be started.";
+      setError(text);
+      setWorking(false);
+      return text;
+    }
+    await Browser.open({ url: result.data.url, presentationStyle: "fullscreen", toolbarColor: "#1c1917" });
+    return null;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     setWorking(true);
@@ -154,6 +235,7 @@ export function useDeviceAccount(enabled: boolean) {
     pendingCount,
     lastSyncedAt,
     signIn,
+    signInWithGoogle,
     signOut,
     upload,
     sync,

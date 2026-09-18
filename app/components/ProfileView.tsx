@@ -52,6 +52,7 @@ type Props = {
     pendingCount: number;
     lastSyncedAt: string | null;
     signIn: (email: string, password: string) => Promise<string | null>;
+    signInWithGoogle: () => Promise<string | null>;
     signOut: () => Promise<void>;
     upload: () => Promise<string | null>;
     sync: () => Promise<string | null>;
@@ -313,6 +314,10 @@ export function ProfileView({
                   if (!result) setSyncPassword("");
                 }}
               >
+                <button type="button" className="button button-secondary" disabled={deviceAccount.working || deviceAccount.loading} onClick={() => void deviceAccount.signInWithGoogle()}>
+                  <Cloud size={16} /> Continue with Google
+                </button>
+                <div className="auth-divider" role="separator"><span>or use email</span></div>
                 <label>
                   Email
                   <input type="email" autoComplete="email" required value={syncEmail} onChange={(event) => setSyncEmail(event.target.value)} />

@@ -169,6 +169,14 @@ Redirect URL: http://localhost:3000/**
 
 Add the exact production URL after deployment.
 
+For Android Google sign-in, also add this redirect URL:
+
+```text
+com.eganstark.pagewise://auth/callback
+```
+
+Then enable Google in Supabase Dashboard under Authentication > Providers. In Google Auth Platform, create a Web application OAuth client, add the Supabase callback URL shown on the Google provider page as an authorized redirect URI, and copy its client ID and secret into Supabase. Only the standard `openid`, email, and profile scopes are required.
+
 ### 5. Start Pagewise
 
 ```bash
@@ -196,7 +204,7 @@ Open `http://localhost:3000`. Without Supabase credentials, the app opens in a c
 
 ## Android application
 
-The Android edition is being built as a local-first Capacitor application rather than a wrapper around the hosted website. Its bundled interface starts without Vercel, and its native SQLite schema covers Pagewise, LitShelves, reading history, profiles, and a future synchronization outbox.
+The Android edition is a local-first Capacitor application rather than a wrapper around the hosted website. Its bundled interface starts without Vercel, and its native SQLite database covers Pagewise, LitShelves, reading history, profiles, durable offline changes, and optional Supabase synchronization.
 
 To compile the native project, install Android Studio with JDK 21 and the Android SDK, then run:
 
@@ -205,7 +213,7 @@ npm run android:sync
 npm run android:open
 ```
 
-The current web application continues to use Supabase while features are migrated packet-by-packet to the device repository. Internet metadata search and optional AI assistance remain online services; the saved library and reading tools are being moved to offline device storage. Google sign-in and private Drive backup will be added after the local data workflows are complete.
+Internet metadata search and optional AI assistance remain online services. The saved library and reading tools work from device storage, while an optional Supabase account provides email/password or Google sign-in, automatic structured-data sync, and private image backup.
 
 ## Deploying to Vercel
 

@@ -5333,6 +5333,22 @@ h1 {
 .profile-form input:focus {
   border-color: var(--accent);
 }
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
 .profile-form label small {
   color: var(--text-muted);
   font-size: 13px;
