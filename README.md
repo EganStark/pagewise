@@ -201,6 +201,7 @@ Open `http://localhost:3000`. Without Supabase credentials, the app opens in a c
 | `npm run android:sync` | Build and copy Pagewise into the native Android project |
 | `npm run android:open` | Open the native project in Android Studio |
 | `npm run android:build` | Create a debug APK after Android Studio/JDK setup |
+| `npm run android:release` | Create the locally signed, optimized release APK |
 
 ## Android application
 
@@ -212,6 +213,8 @@ To compile the native project, install Android Studio with JDK 21 and the Androi
 npm run android:sync
 npm run android:open
 ```
+
+Release signing reads `android/keystore.properties`. The properties file and keystore are deliberately ignored by Git. Back up both files securely: Android updates must always be signed by the same key.
 
 Internet metadata search and optional AI assistance remain online services. The saved library and reading tools work from device storage, while an optional Supabase account provides email/password or Google sign-in, automatic structured-data sync, and private image backup.
 

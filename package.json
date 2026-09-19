@@ -19,7 +19,8 @@
     "android:web": "vite build --config vite.mobile.config.ts",
     "android:sync": "npm run android:web && cap sync android",
     "android:open": "cap open android",
-    "android:build": "npm run android:sync && cd android && gradlew.bat assembleDebug"
+    "android:build": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run android:sync && cd android && gradlew.bat assembleRelease"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.1",
