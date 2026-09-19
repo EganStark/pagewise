@@ -105,6 +105,17 @@ export async function uploadDeviceLibrary(userId: string) {
   if (!supabase) throw new Error("Supabase is not configured.");
   const backup = await createDeviceBackup();
   const data = backup.data;
+  const localRecordCount = Object.entries(data).reduce(
+    (total, [key, value]) => total + (key !== "userSettings" && Array.isArray(value) ? value.length : 0),
+    0,
+  );
+  if (localRecordCount === 0) {
+    const pulled = await pullCloudLibrary(userId);
+    const syncedAt = new Date().toISOString();
+    await setMeta("sync_user_id", userId);
+    await setMeta("last_full_sync_at", syncedAt);
+    return pulled.records;
+  }
   const books = await Promise.all(data.books.map(async (row) => {
     const next = clean(row, userId, "book");
     if (typeof row.cover_local_path === "string") {
