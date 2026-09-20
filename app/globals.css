@@ -5097,6 +5097,9 @@ h1 {
   flex: 0 0 auto;
   height: 34px;
 }
+.diary-filter-toggle {
+  display: none;
+}
 .finished-diary {
   min-width: 850px;
   overflow: hidden;
@@ -7572,12 +7575,20 @@ h1 {
     flex-direction: column-reverse;
   }
   .diary-title-actions {
-    align-items: flex-end;
-    flex-direction: column-reverse;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
   .diary-title-actions .button {
+    width: 100%;
     min-width: 0;
     padding-inline: 11px;
+    justify-content: center;
+  }
+  .diary-title-actions .diary-count {
+    grid-column: 1 / -1;
+    width: max-content;
   }
   .library-title-actions .button {
     min-width: 92px;
@@ -7853,16 +7864,53 @@ h1 {
     left: max(16px, var(--app-safe-left));
   }
   .diary-filters {
-    margin-right: -16px;
-    padding-right: 16px;
-    overflow-x: auto;
-    border-radius: 8px 0 0 8px;
+    margin: 22px 0 16px;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+    gap: 10px;
+    overflow: visible;
+    border-radius: 9px;
   }
   .diary-filters label {
-    flex: 0 0 125px;
+    min-width: 0;
+    font-size: 11px;
+  }
+  .diary-filters .diary-search-filter {
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+  .diary-filters select,
+  .diary-filters input {
+    width: 100%;
+    height: 40px;
+  }
+  .diary-filters:not(.expanded) > label:not(.diary-search-filter) {
+    display: none;
+  }
+  .diary-filter-toggle {
+    height: 40px;
+    display: flex;
+    justify-content: center;
+  }
+  .diary-filter-toggle span {
+    color: var(--accent);
+    font-size: 18px;
+    line-height: 0;
+  }
+  .diary-clear-filters {
+    width: 100%;
+    height: 40px;
+    justify-content: center;
   }
   .diary-view {
-    overflow: hidden;
+    min-width: 0;
+    overflow: visible;
+  }
+  .diary-view .library-title-row {
+    display: grid;
+    gap: 18px;
   }
   .finished-diary {
     min-width: 0;
@@ -7874,53 +7922,91 @@ h1 {
     display: none;
   }
   .finished-diary-row {
-    min-height: 91px;
-    margin-bottom: 8px;
-    padding: 8px 9px;
-    grid-template-columns: 62px minmax(0, 1fr) 42px;
+    min-width: 0;
+    min-height: 86px;
+    margin-bottom: 10px;
+    padding: 9px;
+    grid-template-columns: 46px minmax(0, 1fr) 38px;
+    grid-template-rows: 1fr 1fr;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
   }
   .finished-diary-row > time {
     grid-column: 1;
     grid-row: 1 / span 2;
+    height: auto;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .finished-diary-row time strong,
+  .finished-diary-row time small,
+  .finished-diary-row time b {
+    min-width: 0;
+    padding: 0;
   }
   .finished-diary-row time b {
-    min-width: 28px;
-    padding-right: 5px;
-    font-size: 18px;
+    order: -1;
+    font-size: 20px;
+    line-height: 1;
   }
   .diary-book {
     grid-column: 2;
-    padding-right: 5px;
+    grid-row: 1 / span 2;
+    min-width: 0;
+    padding: 5px 6px 23px 10px;
+    gap: 9px;
   }
   .diary-book > span {
-    width: 38px;
-    height: 54px;
+    width: 34px;
+    height: 49px;
+  }
+  .diary-book > strong {
+    min-width: 0;
+    overflow: hidden;
+    display: block;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .diary-book small {
+    font-size: 11.5px;
   }
   .finished-diary-row > span {
     display: none;
   }
   .finished-diary-row > .diary-rating {
     grid-column: 2;
+    grid-row: 2;
+    z-index: 1;
+    align-self: end;
     display: block;
-    padding-left: 49px;
+    padding: 0 0 5px 53px;
+    pointer-events: none;
     text-align: left;
   }
   .diary-edit {
     grid-column: 3;
     grid-row: 2;
-    height: 45px;
-    align-self: end;
+    width: 38px;
+    height: 34px;
     border-left: 1px solid var(--border);
+    border-radius: 0 0 6px 0;
   }
   .diary-favorite {
     grid-column: 3;
     grid-row: 1;
-    height: 45px;
-    align-self: start;
+    width: 38px;
+    height: 34px;
+    align-self: end;
     border-left: 1px solid var(--border);
+    border-radius: 0 6px 0 0;
   }
   .profile-grid {
     grid-template-columns: 1fr;

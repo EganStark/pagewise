@@ -9,6 +9,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { type SetStateAction, useMemo, useState } from "react";
@@ -106,6 +107,7 @@ export function DiaryView({
   const [pageState, setPageState] = useRememberedDiaryState("pageState");
   const [editing, setEditing] = useState<ReadingAttempt | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [pickerBookId, setPickerBookId] = useState("");
   const [loggingBook, setLoggingBook] = useState<Book | null>(null);
   const [favoriteWorkingId, setFavoriteWorkingId] = useState<string | null>(
@@ -323,7 +325,7 @@ export function DiaryView({
           </button>
         </div>
       </div>
-      <div className="diary-filters">
+      <div className={`diary-filters ${filtersOpen ? "expanded" : ""}`}>
         <label className="diary-search-filter">
           Find a finished book
           <span>
@@ -336,6 +338,16 @@ export function DiaryView({
             />
           </span>
         </label>
+        <button
+          className="button button-secondary diary-filter-toggle"
+          type="button"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <SlidersHorizontal size={15} />
+          {filtersOpen ? "Hide filters" : "Filters"}
+          {hasActiveFilters ? <span aria-label="Active filters">•</span> : null}
+        </button>
         <label>
           Diary year
           <select
