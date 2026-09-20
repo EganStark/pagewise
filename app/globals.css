@@ -8194,6 +8194,84 @@ h1 {
   .bottom-nav button {
     font-size: 11.5px;
   }
+
+  .library-covers-view {
+    grid-template-columns: repeat(2, minmax(0, 145px));
+    justify-content: space-between;
+    gap: 24px 12px;
+  }
+  .library-covers-view .library-book {
+    width: 100%;
+    max-width: 145px;
+  }
+  .library-covers-view .library-cover-wrap {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    box-shadow: 5px 10px 20px rgb(0 0 0 / 20%);
+  }
+  .library-covers-view .library-cover-wrap::after {
+    height: 8px;
+    right: -5px;
+    bottom: -9px;
+    left: -5px;
+  }
+  .library-covers-view .favorite-button,
+  .library-covers-view .book-menu-button,
+  .library-covers-view .book-selection-indicator {
+    width: 30px;
+    height: 30px;
+    top: 6px;
+  }
+  .library-covers-view .favorite-button,
+  .library-covers-view .book-selection-indicator {
+    left: 6px;
+  }
+  .library-covers-view .book-menu-button {
+    right: 6px;
+  }
+  .library-covers-view .library-book-copy {
+    padding: 10px 1px 0;
+  }
+  .library-covers-view .library-book-copy h2 {
+    min-height: 36px;
+    margin: 5px 0 2px;
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.2;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .library-covers-view .library-book-copy p {
+    margin: 0 0 5px;
+    font-size: 12.5px;
+  }
+  .library-covers-view .library-book-copy small {
+    font-size: 11.5px;
+  }
+  .library-covers-view .status-dot {
+    gap: 4px;
+    font-size: 10.5px;
+    letter-spacing: 0.045em;
+  }
+  .library-compact-view {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px 10px;
+  }
+  .library-compact-view .favorite-button,
+  .library-compact-view .book-menu-button {
+    width: 28px;
+    height: 28px;
+    top: 5px;
+  }
+  .library-compact-view .favorite-button {
+    left: 5px;
+  }
+  .library-compact-view .book-menu-button {
+    right: 5px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
