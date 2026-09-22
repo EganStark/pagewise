@@ -8299,8 +8299,8 @@ h1 {
 
   .library-covers-view {
     grid-template-columns: repeat(2, minmax(0, 145px));
-    justify-content: space-between;
-    gap: 24px 12px;
+    justify-content: center;
+    gap: 24px 18px;
   }
   .library-covers-view .library-book {
     width: 100%;
