@@ -8298,13 +8298,13 @@ h1 {
   }
 
   .library-covers-view {
-    grid-template-columns: repeat(2, minmax(0, 145px));
-    justify-content: center;
-    gap: 24px 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: center;
+    gap: 24px 16px;
   }
   .library-covers-view .library-book {
     width: 100%;
-    max-width: 145px;
+    max-width: 162px;
   }
   .library-covers-view .library-cover-wrap {
     width: 100%;
