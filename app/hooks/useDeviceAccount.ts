@@ -3,6 +3,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
+import { Network } from "@capacitor/network";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEVICE_CHANGE_EVENT } from "../lib/device-outbox";
 import { getDeviceSyncState, synchronizeDeviceLibrary, uploadDeviceLibrary } from "../lib/device-sync";
@@ -134,7 +135,10 @@ export function useDeviceAccount(enabled: boolean) {
   useEffect(() => {
     if (!enabled || !session?.user.id) return;
     const userId = session.user.id;
+    let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let removeNetworkListener: (() => Promise<void>) | null = null;
+    let removeAppStateListener: (() => Promise<void>) | null = null;
     const requestSync = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => void sync(true), 1200);
@@ -146,12 +150,30 @@ export function useDeviceAccount(enabled: boolean) {
     }, 0);
     window.addEventListener("online", requestSync);
     window.addEventListener(DEVICE_CHANGE_EVENT, requestSync);
+    void Network.addListener("networkStatusChange", ({ connected }) => {
+      if (active && connected) requestSync();
+    }).then((handle) => {
+      if (active) removeNetworkListener = () => handle.remove();
+      else void handle.remove();
+    });
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (active && isActive) requestSync();
+    }).then((handle) => {
+      if (active) removeAppStateListener = () => handle.remove();
+      else void handle.remove();
+    });
+    void Network.getStatus().then(({ connected }) => {
+      if (active && connected) requestSync();
+    });
     const interval = window.setInterval(requestSync, 60_000);
     return () => {
+      active = false;
       if (timer) clearTimeout(timer);
       window.clearInterval(interval);
       window.removeEventListener("online", requestSync);
       window.removeEventListener(DEVICE_CHANGE_EVENT, requestSync);
+      if (removeNetworkListener) void removeNetworkListener();
+      if (removeAppStateListener) void removeAppStateListener();
     };
   }, [enabled, refreshSyncState, session?.user.id, sync]);
 
