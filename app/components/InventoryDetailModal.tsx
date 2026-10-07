@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { Book } from "../lib/books";
 import type { AiMetadataSuggestion } from "../lib/ai-metadata";
 import type { InventoryCondition, InventoryItem } from "../lib/inventory";
@@ -85,7 +86,7 @@ export function InventoryDetailModal({
       if (form.author.trim()) params.set("author", form.author.trim());
       if (form.isbn.trim()) params.set("isbn", form.isbn.trim());
       if (form.publication_year) params.set("year", form.publication_year);
-      const response = await fetch(`/api/metadata/search?${params}`);
+      const response = await fetch(apiUrl(`/api/metadata/search?${params}`));
       if (!response.ok) throw new Error("Metadata search is unavailable.");
       const payload = (await response.json()) as MetadataSearchResponse;
       setSuggestions(payload.candidates.slice(0, 4));
@@ -130,7 +131,7 @@ export function InventoryDetailModal({
       const { data } = await supabase.auth.getSession();
       if (!data.session?.access_token)
         throw new Error("Sign in before using AI assistance.");
-      const response = await fetch("/api/metadata/assist", {
+      const response = await fetch(apiUrl("/api/metadata/assist"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${data.session.access_token}`,

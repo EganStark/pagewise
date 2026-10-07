@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { BookList } from "../lib/book-lists";
 import type { Book, BookInput } from "../lib/books";
 import type {
@@ -234,7 +235,7 @@ export function GlobalSearch({
           q: deferredQuery,
           type: detectedType,
         });
-        const response = await fetch(`/api/metadata/search?${params}`, {
+        const response = await fetch(apiUrl(`/api/metadata/search?${params}`), {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Internet search unavailable");

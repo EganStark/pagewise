@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { Book, BookInput } from "../lib/books";
 import {
   normalizeBookText,
@@ -134,7 +135,7 @@ export function AddInventoryModal(props: Props) {
     setError(null);
     try {
       const response = await fetch(
-        `/api/metadata/search?q=${encodeURIComponent(query.trim())}`,
+        apiUrl(`/api/metadata/search?q=${encodeURIComponent(query.trim())}`),
       );
       if (!response.ok) throw new Error("Metadata search is unavailable.");
       const payload = (await response.json()) as MetadataSearchResponse;
@@ -193,7 +194,7 @@ export function AddInventoryModal(props: Props) {
       const { data } = await supabase.auth.getSession();
       if (!data.session?.access_token)
         throw new Error("Sign in before using AI assistance.");
-      const response = await fetch("/api/metadata/assist", {
+      const response = await fetch(apiUrl("/api/metadata/assist"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${data.session.access_token}`,

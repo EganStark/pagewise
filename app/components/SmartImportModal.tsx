@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { Book, BookInput } from "../lib/books";
 import { normalizeBookText, normalizeIsbn } from "../lib/cover-images";
 import {
@@ -117,7 +118,7 @@ export function SmartImportModal({ open, books, onClose, onSave }: Props) {
           q: item.isbn ? query : item.title,
         });
         if (item.author) params.set("author", item.author);
-        const response = await fetch(`/api/metadata/search?${params}`);
+        const response = await fetch(apiUrl(`/api/metadata/search?${params}`));
         const payload = response.ok
           ? ((await response.json()) as MetadataSearchResponse)
           : { candidates: [], providers: [] };
@@ -252,7 +253,7 @@ export function SmartImportModal({ open, books, onClose, onSave }: Props) {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("Sign in before using AI assistance.");
-      const response = await fetch("/api/metadata/assist", {
+      const response = await fetch(apiUrl("/api/metadata/assist"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

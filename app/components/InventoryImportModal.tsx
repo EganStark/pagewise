@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { ChangeEvent, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { InventoryInput, InventoryItem } from "../lib/inventory";
 import {
   parseInventoryImport,
@@ -129,7 +130,7 @@ export function InventoryImportModal({ open, items, onClose, onSave }: Props) {
             const params = new URLSearchParams({ q: row.title });
             if (row.author) params.set("author", row.author);
             if (row.isbn) params.set("isbn", row.isbn);
-            const response = await fetch(`/api/metadata/search?${params}`);
+            const response = await fetch(apiUrl(`/api/metadata/search?${params}`));
             const payload = response.ok
               ? ((await response.json()) as MetadataSearchResponse)
               : { candidates: [] };
@@ -189,7 +190,7 @@ export function InventoryImportModal({ open, items, onClose, onSave }: Props) {
       const { data } = await supabase.auth.getSession();
       if (!data.session?.access_token)
         throw new Error("Sign in before using AI assistance.");
-      const response = await fetch("/api/metadata/assist", {
+      const response = await fetch(apiUrl("/api/metadata/assist"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${data.session.access_token}`,

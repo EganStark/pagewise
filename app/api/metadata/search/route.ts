@@ -14,6 +14,10 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 60;
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
 
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
+
 function allowRequest(request: NextRequest) {
   const forwarded = request.headers
     .get("x-forwarded-for")

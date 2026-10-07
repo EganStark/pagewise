@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { Book, BookInput } from "../lib/books";
 import type {
   MetadataCandidate,
@@ -81,7 +82,7 @@ export function InternetSearchView({
           type: request.type,
           limit: "40",
         });
-        const response = await fetch(`/api/metadata/search?${params}`, {
+        const response = await fetch(apiUrl(`/api/metadata/search?${params}`), {
           signal: controller.signal,
         });
         if (!response.ok)

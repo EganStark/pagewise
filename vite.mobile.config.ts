@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => {
       "process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY": JSON.stringify(
         env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       ),
+      "process.env.NEXT_PUBLIC_PAGEWISE_API_URL": JSON.stringify(
+        env.NEXT_PUBLIC_PAGEWISE_API_URL ?? "https://pagewise-rose.vercel.app",
+      ),
     },
     build: {
       outDir: "../mobile-dist",

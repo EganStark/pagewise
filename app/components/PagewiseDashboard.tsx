@@ -470,7 +470,7 @@ export default function PagewiseDashboard({
             className="button button-primary"
             onClick={() => setAddBookOpen(true)}
           >
-            <Plus size={18} /> Add book
+            <Plus size={18} /> <span>Add book</span>
           </button>
           <button
             className="theme-quick-toggle"

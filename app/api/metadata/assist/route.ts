@@ -8,6 +8,10 @@ import {
 
 const userWindows = new Map<string, { startedAt: number; count: number }>();
 
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
+
 function limited(userId: string) {
   const now = Date.now();
   const current = userWindows.get(userId);

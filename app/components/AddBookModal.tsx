@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { apiUrl } from "../lib/api-url";
 import type { Book, BookInput, BookStatus } from "../lib/books";
 import type {
   AiMetadataFields,
@@ -155,7 +156,7 @@ export function AddBookModal({
     setError(null);
     try {
       const response = await fetch(
-        `/api/metadata/search?q=${encodeURIComponent(query.trim())}`,
+        apiUrl(`/api/metadata/search?q=${encodeURIComponent(query.trim())}`),
       );
       if (!response.ok)
         throw new Error("Book metadata providers are unavailable right now.");
@@ -385,7 +386,7 @@ export function AddBookModal({
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("Sign in before using AI assistance.");
-      const response = await fetch("/api/metadata/assist", {
+      const response = await fetch(apiUrl("/api/metadata/assist"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
