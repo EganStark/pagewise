@@ -7535,6 +7535,28 @@ h1 {
     height: calc(66px + var(--app-safe-top));
     padding: var(--app-safe-top) max(16px, var(--app-safe-right)) 0 max(16px, var(--app-safe-left));
   }
+  .pull-refresh-indicator {
+    position: fixed;
+    top: calc(75px + var(--app-safe-top));
+    left: 50%;
+    z-index: 22;
+    min-height: 38px;
+    padding: 8px 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .pull-refresh-indicator svg {
+    color: var(--accent);
+  }
   .smart-import-trigger {
     width: 40px;
     padding: 0;

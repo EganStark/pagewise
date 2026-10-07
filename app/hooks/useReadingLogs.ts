@@ -270,5 +270,5 @@ export function useReadingLogs(
     [deviceMode, previewMode],
   );
 
-  return { logs, loading, working, error, saveLog, deleteLog };
+  return { logs, loading, working, error, refresh, saveLog, deleteLog };
 }

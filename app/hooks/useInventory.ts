@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   PREVIEW_INVENTORY,
   type InventoryInput,
@@ -20,6 +20,33 @@ export function useInventory(userId: string | null, previewMode: boolean, device
   );
   const [loading, setLoading] = useState(!previewMode);
   const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (deviceMode) {
+      try {
+        setItems(await listDeviceInventory());
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Could not refresh your shelves.");
+        throw cause;
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    if (previewMode || !supabase || !userId) return;
+    const { data, error: queryError } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .order("updated_at", { ascending: false });
+    setLoading(false);
+    if (queryError) {
+      setError(queryError.message);
+      throw queryError;
+    }
+    setError(null);
+    setItems((data ?? []) as InventoryItem[]);
+  }, [deviceMode, previewMode, userId]);
 
   useEffect(() => {
     if (deviceMode) {
@@ -152,5 +179,5 @@ export function useInventory(userId: string | null, previewMode: boolean, device
     return null;
   }
 
-  return { items, loading, error, addItem, updateItem, deleteItem };
+  return { items, loading, error, refresh, addItem, updateItem, deleteItem };
 }

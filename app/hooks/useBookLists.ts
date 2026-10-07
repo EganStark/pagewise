@@ -376,6 +376,7 @@ export function useBookLists(userId: string | null, previewMode: boolean, device
     loading,
     working,
     error,
+    refresh,
     createList,
     updateList,
     deleteList,

@@ -15,6 +15,7 @@ import {
   Menu,
   Moon,
   Plus,
+  RefreshCw,
   Settings,
   Sparkles,
   Sun,
@@ -22,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBooks } from "../hooks/useBooks";
 import { useReadingLogs } from "../hooks/useReadingLogs";
 import { useBookLists } from "../hooks/useBookLists";
@@ -153,6 +154,15 @@ export default function PagewiseDashboard({
   const [internetSearch, setInternetSearch] =
     useState<InternetSearchRequest | null>(null);
   const [searchReturnActive, setSearchReturnActive] = useState("Home");
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const pageContentRef = useRef<HTMLDivElement>(null);
+  const pullStartY = useRef<number | null>(null);
+  const pullStartX = useRef<number | null>(null);
+  const pullDistanceRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bookStore = useBooks(userId, previewMode, deviceMode);
   const inventory = useInventory(userId, previewMode, deviceMode);
   const readingLogs = useReadingLogs(
@@ -177,6 +187,93 @@ export default function PagewiseDashboard({
   );
   const profile = useProfileSettings(userId, previewMode, stats.year, deviceMode);
   const deviceAccount = useDeviceAccount(deviceMode);
+  const refreshDeviceData = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    setRefreshNotice(null);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    try {
+      let syncError: string | null = null;
+      if (deviceAccount.linked && navigator.onLine) {
+        try {
+          syncError = await deviceAccount.sync(true);
+        } catch (cause) {
+          syncError = cause instanceof Error ? cause.message : "Cloud sync failed";
+        }
+      }
+      const results = await Promise.allSettled([
+        bookStore.refresh(),
+        inventory.refresh(),
+        bookLists.refresh(),
+        readingLogs.refresh(),
+        completedAttempts.refresh(),
+      ]);
+      const localError = results.some((result) => result.status === "rejected");
+      setRefreshNotice(
+        localError ? "Could not refresh all local data" : syncError
+          ? "Local data updated; cloud sync failed" : deviceAccount.linked && !navigator.onLine
+            ? "Offline — local data updated" : "Up to date",
+      );
+      noticeTimer.current = setTimeout(() => setRefreshNotice(null), 2400);
+    } finally {
+      setRefreshing(false);
+      refreshingRef.current = false;
+      setPullDistance(0);
+      pullDistanceRef.current = 0;
+    }
+  }, [bookStore, inventory, bookLists, readingLogs, completedAttempts, deviceAccount]);
+
+  useEffect(() => {
+    if (!deviceMode) return;
+    const surface = pageContentRef.current;
+    if (!surface) return;
+    const reset = () => {
+      pullStartY.current = null;
+      pullStartX.current = null;
+      if (!refreshingRef.current) {
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+    const onStart = (event: TouchEvent) => {
+      const target = event.target;
+      if (refreshingRef.current || window.scrollY > 1 || event.touches.length !== 1 ||
+        !(target instanceof Element) ||
+        target.closest("input, select, textarea, button, a, [contenteditable], .modal-layer")) return;
+      pullStartY.current = event.touches[0].clientY;
+      pullStartX.current = event.touches[0].clientX;
+    };
+    const onMove = (event: TouchEvent) => {
+      if (pullStartY.current === null || event.touches.length !== 1) return;
+      const distance = event.touches[0].clientY - pullStartY.current;
+      const sideways = Math.abs(event.touches[0].clientX - (pullStartX.current ?? 0));
+      if (sideways > Math.max(12, distance * 0.7)) return reset();
+      if (distance <= 0 || window.scrollY > 1) return reset();
+      event.preventDefault();
+      pullDistanceRef.current = Math.min(104, distance * 0.55);
+      setPullDistance(pullDistanceRef.current);
+    };
+    const onEnd = () => {
+      const ready = pullDistanceRef.current >= 64;
+      reset();
+      if (ready) void refreshDeviceData();
+    };
+    surface.addEventListener("touchstart", onStart, { passive: true });
+    surface.addEventListener("touchmove", onMove, { passive: false });
+    surface.addEventListener("touchend", onEnd);
+    surface.addEventListener("touchcancel", reset);
+    return () => {
+      surface.removeEventListener("touchstart", onStart);
+      surface.removeEventListener("touchmove", onMove);
+      surface.removeEventListener("touchend", onEnd);
+      surface.removeEventListener("touchcancel", reset);
+    };
+  }, [deviceMode, refreshDeviceData]);
+
+  useEffect(() => () => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+  }, []);
   const currentBooks = useMemo(
     () =>
       bookStore.books.filter((book) => book.status === "reading").slice(0, 2),
@@ -411,7 +508,14 @@ export default function PagewiseDashboard({
           </div>
         </header>
 
-        <div className="page-content" id="main-content" tabIndex={-1}>
+        {deviceMode && (pullDistance > 0 || refreshing || refreshNotice) && (
+          <div className={`pull-refresh-indicator ${refreshing ? "refreshing" : ""}`} role="status" aria-live="polite"
+            style={{ transform: `translate(-50%, ${Math.min(pullDistance, 64)}px)` }}>
+            <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+            {refreshing ? "Refreshing…" : refreshNotice || (pullDistance >= 64 ? "Release to refresh" : "Pull to refresh")}
+          </div>
+        )}
+        <div className="page-content" id="main-content" tabIndex={-1} ref={pageContentRef}>
           {previewMode && (
             <div className="preview-banner">
               <span>Preview mode</span>You’re exploring Pagewise with sample
